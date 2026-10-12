@@ -154,7 +154,8 @@ def _wire_ui(reg, local) -> None:
                               "ui.check_contrast"]))
 
 
-def _brief_dict(br) -> dict:    from ..ui import strategy as _st
+def _brief_dict(br) -> dict:
+    from ..ui import strategy as _st
     st = _st.select(br.needs_client_mod, br.needs_resource_pack)
     return {"style": br.style, "screens": br.screens, "features": br.features,
             "strategy": st["key"], "strategy_name": st["name"],
