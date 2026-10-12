@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: forge-core
+Version: 0.1.0
+Summary: FORGE MVP: module registry, skills, knowledge base, MCP server
+Requires-Python: >=3.10
+License-File: LICENSE
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
+Dynamic: license-file
