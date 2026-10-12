@@ -1,30 +1,51 @@
-# FORGE Core (MVP)
+# FORGE AI Toolkit
 
-Universal AI Capability Enhancement Framework — thin layer over real tools
-(Anvil/Hermes), portable Skills, SQLite knowledge base, MCP server.
+> **RU:** Внешний инструментарий для ИИ-агентов: экспертные навыки, MCP-сервер,
+> анализ проектов, тестовая лаборатория Minecraft/Java. Без обучения моделей,
+> без платных API, без выдумок — только проверяемые инструменты.
+>
+> **EN:** External toolkit for AI agents: expert skills, MCP server, project
+> intelligence, Minecraft/Java testing lab. No model training, no paid APIs,
+> no hallucinated results — only verifiable tools.
 
-## Layout (grows into module-packs/, tests/benchmarks/, apps/desktop/)
+## Что это / What is this
 
-- `src/forge/core/` — module registry + tool protocol
-- `src/forge/skills/` — skill loader (SKILL.md)
-- `src/forge/knowledge/` — SQLite FTS store
-- `src/forge/mcp/` — stdio MCP server (tools/list, tools/call)
-- `src/forge/cli/` — CLI
-- `skills/` — portable skill packs
-- `knowledge/seed.jsonl` — first facts
-- `tests/` — pytest (unit now, benchmarks/ later)
+FORGE подключается к существующему ИИ-агенту и даёт ему: знания с поиском,
+переносимые Skills, ~120 инструментов Anvil + сервисы Hermes через один CLI,
+MCP-сервер для совместимых клиентов и изолированную Testing Lab, где плагины
+реально собираются и гоняются на настоящем сервере.
 
-## Run
+FORGE plugs into your existing AI agent and gives it: searchable knowledge,
+portable Skills, ~120 Anvil tools + Hermes services behind one CLI, an MCP
+server for compatible clients, and an isolated Testing Lab where plugins are
+really built and run against a real server.
+
+## Быстрый старт / Quickstart
 
 ```bat
-cd forge
-python -m pytest tests -q
-python -m forge.cli modules
-python -m forge.cli skill java-expert
-python -m forge.mcp.server
+python -m venv .venv
+.venv\Scripts\python -m pip install -e forge
+.venv\Scripts\python -m pytest forge\tests -q
+.venv\Scripts\python -m forge.cli modules
+.venv\Scripts\python -m forge.cli lab e2e
 ```
 
-## Status
+## Возможности / Features
 
-Phase 0/1: registry + skills + knowledge + MCP skeleton + tests green.
-Desktop (Tauri) deferred: no Node in env.
+- Skills (java-expert, paper-plugin-expert, build-repair, ...) с валидацией
+- Module packs + Expert Router (`forge route "..."`)
+- SQLite FTS база знаний (`forge know ...`)
+- MCP-сервер, проверенный официальным SDK-клиентом
+- Testing Lab: сборка, unit-тесты, реальный Purpur, команды, отчёты
+- AAA Interface Engine: брифы, стратегии A/B/C/D, валидация GUI, PNG-ассеты
+- Генератор Paper-плагинов (`forge gen paper ...`)
+
+## Статус / Status
+
+MVP + Testing Lab + UI Engine работают и покрыты тестами (`forge 0.7.x`).
+Десктоп отложен (нужен Node.js). Скриншотные тесты и автоклиент — честно
+отмечены как NOT_IMPLEMENTED.
+
+## Лицензия / License
+
+MIT — см. `forge/LICENSE`.
