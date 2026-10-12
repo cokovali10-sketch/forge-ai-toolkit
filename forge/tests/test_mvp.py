@@ -301,6 +301,32 @@ def test_bench_unknown_check_type(tmp_path):
     assert r.passed is False
 
 
+def test_mcp_more_tools_no_anvil():
+    from forge.mcp.server import build_default_registry
+    reg = build_default_registry()  # no anvil dir: minecraft.* must fail clean
+    r = reg.call("minecraft.validate_plugin_metadata", {"project": "."})
+    assert r["ok"] is False and "not configured" in r["error"]
+    s = reg.call("knowledge.search", {"query": "glfwGetKeyName"})
+    assert s["ok"] and s["data"]["hits"]
+    g = reg.call("knowledge.get_fact", {"id": 1})
+    assert g["ok"] and g["data"]["fact"]["id"] == 1
+    assert reg.call("knowledge.get_fact", {"id": 999999})["data"]["fact"] is None
+
+
+def test_code_review_finds_debt(tmp_path):
+    from forge.quality.review import review
+    (tmp_path / "a.py").write_text(
+        "x = 1\n# TODO: fix this later\ntry:\n y()\nexcept Exception:\n pass\n"
+        "print('debug')\n", encoding="utf-8")
+    (tmp_path / "b.py").write_text("\n".join(f"line_{i} = {i}" for i in range(900)),
+                                   encoding="utf-8")
+    r = review(tmp_path)
+    assert r["files"] == 2
+    rules = {f["rule"] for f in r["findings"]}
+    assert "debt-marker" in rules and "oversized-file" in rules
+    assert r["confirmed"] >= 1
+
+
 def test_config_defaults_and_validation(tmp_path):
     from forge.config.settings import example, load
     cfg, warns = load(tmp_path / "none.toml")

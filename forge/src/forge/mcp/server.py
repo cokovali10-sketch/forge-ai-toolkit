@@ -109,6 +109,7 @@ def build_default_registry(anvil_dir: str = "") -> Registry:
                              "0.1.0", [t[0] for t in TOOLS]))
     _wire_lab(reg, local)
     _wire_ui(reg, local)
+    _wire_more(reg, local, anvil_dir)
     if anvil_dir and Path(anvil_dir, "anvil_call.py").is_file():
         reg.add_backend("anvil", AnvilBackend(anvil_dir))
         reg.add_module(ModuleDef("anvil", "Anvil tool bridge", "0.1.0", []))
@@ -153,12 +154,87 @@ def _wire_ui(reg, local) -> None:
                               "ui.check_contrast"]))
 
 
-def _brief_dict(br) -> dict:
-    from ..ui import strategy as _st
+def _brief_dict(br) -> dict:    from ..ui import strategy as _st
     st = _st.select(br.needs_client_mod, br.needs_resource_pack)
     return {"style": br.style, "screens": br.screens, "features": br.features,
             "strategy": st["key"], "strategy_name": st["name"],
             "notes": br.notes}
+
+
+def _wire_more(reg, local, anvil_dir: str) -> None:
+    """Minecraft (via Anvil), knowledge (seed store), code review."""
+    from ..core.registry import AnvilBackend, ToolDef
+    from ..knowledge.store import KnowledgeStore
+    from ..quality.review import review as _review
+    from pathlib import Path as _P
+
+    seed_holder: dict = {}
+
+    def _store() -> KnowledgeStore:
+        if "ks" not in seed_holder:
+            ks = KnowledgeStore()
+            seed = _P(__file__).resolve().parents[3] / "knowledge" / "seed.jsonl"
+            if seed.is_file():
+                ks.load_jsonl(seed)
+            seed_holder["ks"] = ks
+        return seed_holder["ks"]
+
+    def _anvil():
+        if not anvil_dir or not _P(anvil_dir, "anvil_call.py").is_file():
+            return None
+        return AnvilBackend(anvil_dir)
+
+    def _mc_meta(project: str) -> dict:
+        base = _P(project)
+        for cand in (base / "src" / "main" / "resources" / "plugin.yml",
+                     base / "src" / "main" / "resources" / "paper-plugin.yml"):
+            if cand.is_file():
+                return {"meta": str(cand)}
+        return {"meta": ""}
+
+    local.add(ToolDef("minecraft.validate_plugin_metadata",
+                      "plugin.yml lint via Anvil"),
+              lambda p: _anvil().call(
+                  "plugin_yml_lint",
+                  {"path": _mc_meta(p.get("project", "."))["meta"] or "plugin.yml"})
+              if _anvil() else {"ok": False,
+                                "error": "anvil backend not configured"})
+    local.add(ToolDef("minecraft.check_permissions",
+                      "permission checks vs declarations"),
+              lambda p: _anvil().call(
+                  "perm_audit",
+                  {"src": str(_P(p.get("project", ".")) / "src")})
+              if _anvil() else {"ok": False,
+                                "error": "anvil backend not configured"})
+    local.add(ToolDef("minecraft.check_compatibility",
+                      "api-version vs MC via Anvil"),
+              lambda p: _anvil().call("api_version_check", {
+                  "api": p.get("api", ""), "mc": p.get("mc", "")})
+              if _anvil() else {"ok": False,
+                                "error": "anvil backend not configured"})
+    local.add(ToolDef("minecraft.analyze_logs", "lifecycle+errors for a plugin"),
+              lambda p: _anvil().call("log_scan", {
+                  "path": p.get("log", ""), "plugin": p.get("plugin", "")})
+              if _anvil() else {"ok": False,
+                                "error": "anvil backend not configured"})
+    local.add(ToolDef("knowledge.search", "FTS over FORGE facts"),
+              lambda p: {"hits": _store().search(
+                  p.get("query", ""), p.get("domain", ""),
+                  int(p.get("limit", 5)))})
+    local.add(ToolDef("knowledge.get_fact", "Single fact by id"),
+              lambda p: {"fact": _store().get(int(p.get("id", -1)))})
+    local.add(ToolDef("code.review", "Static review: debt/dups/size"),
+              lambda p: _review(p.get("root", "."),
+                               int(p.get("max_files", 500))))
+    reg.add_module(ModuleDef("minecraft", "Minecraft checks via Anvil", "0.1.0",
+                             ["minecraft.validate_plugin_metadata",
+                              "minecraft.check_permissions",
+                              "minecraft.check_compatibility",
+                              "minecraft.analyze_logs"]))
+    reg.add_module(ModuleDef("knowledge", "Knowledge tools", "0.1.0",
+                             ["knowledge.search", "knowledge.get_fact"]))
+    reg.add_module(ModuleDef("quality", "Static review", "0.1.0",
+                             ["code.review"]))
 
 
 def main() -> None:

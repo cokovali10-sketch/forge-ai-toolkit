@@ -74,3 +74,12 @@ class KnowledgeStore:
 
     def count(self) -> int:
         return int(self.db.execute("SELECT COUNT(*) FROM facts").fetchone()[0])
+
+    def get(self, fact_id: int) -> dict | None:
+        r = self.db.execute(
+            "SELECT id,domain,title,body,source FROM facts WHERE id=?",
+            (fact_id,)).fetchone()
+        if r is None:
+            return None
+        return {"id": r[0], "domain": r[1], "title": r[2], "body": r[3],
+                "source": r[4]}

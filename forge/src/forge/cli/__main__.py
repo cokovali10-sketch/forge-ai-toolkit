@@ -114,6 +114,14 @@ def _config(args: list[str]) -> int:
     if args and args[0] == "example":
         print(example())
         return 0
+    if args and args[0] == "init":
+        p = ROOT / "forge.toml"
+        if p.is_file():
+            print(f"exists: {p}")
+            return 0
+        p.write_text(example(), encoding="utf-8")
+        print(f"wrote {p}")
+        return 0
     cfg, warnings = load()
     print(_json.dumps({"config": cfg, "warnings": warnings},
                       ensure_ascii=False, indent=2))
