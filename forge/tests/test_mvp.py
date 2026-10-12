@@ -231,6 +231,41 @@ def test_router_respects_limit_and_empty():
     assert len(route("java gradle minecraft plugin build test", packs, limit=2)) <= 2
 
 
+class _LogServer:
+    def __init__(self, log):
+        self._log = log
+
+    def full_log(self):
+        return self._log
+
+    def command(self, cmd, expect="", timeout=5):
+        return {"ok": True, "output": "done"}
+
+
+def test_lab_log_contains_scenario():
+    from forge.lab import scenarios as _sc
+    srv = _LogServer("boot ok\nMyMod enabled v1\n")
+    ok = _sc.run(srv, _sc.log_contains("x", "MyMod enabled"))
+    assert ok.status == "PASS"
+    bad = _sc.run(srv, _sc.log_contains("x", "never here"))
+    assert bad.status == "FAIL" and bad.expected == "never here"
+
+
+def test_lab_errors_allowlist():
+    from forge.lab.server import ServerProc
+    from forge.lab import env as _env
+    import tempfile as _t
+    with _t.TemporaryDirectory() as tmp:
+        e = _env.create(tmp, _env.ServerProfile())
+        try:
+            s = ServerProc(e)
+            s.lines = [(0.0, "[X] ERROR: boom"), (1.0, "[Essentials] ERROR: noise")]
+            assert len(s.errors()) == 2
+            assert s.errors(ignore=["[Essentials]"]) == ["[X] ERROR: boom"]
+        finally:
+            _env.destroy(e, keep_artifacts=False)
+
+
 def test_bench_good_bad():
     from forge.bench.runner import load_task, run_task
     from pathlib import Path as _P

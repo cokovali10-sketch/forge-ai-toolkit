@@ -34,6 +34,15 @@ def plugin_load(name: str, expect_enabled: str = "") -> Scenario:
     )
 
 
+def log_contains(name: str, text: str) -> Scenario:
+    """Asserts text already present in the server log (boot messages)."""
+    return Scenario(
+        name=f"log-contains:{name}",
+        goal=f"Server log contains {text!r}",
+        steps=[{"log_contains": text}],
+    )
+
+
 def command_check(command: str, expect: str, timeout: int = 20) -> Scenario:
     return Scenario(
         name=f"command:{command}",
@@ -48,6 +57,19 @@ def run(server, scenario: Scenario) -> ScenarioResult:
     try:
         last: dict = {}
         for step in scenario.steps:
+            if "log_contains" in step:
+                want = step["log_contains"]
+                log = server.full_log() if hasattr(server, "full_log") else ""
+                ok = want in log
+                repro.append(f"? log contains {want!r}")
+                if not ok:
+                    return ScenarioResult(
+                        scenario.name, "FAIL", scenario.goal,
+                        expected=want,
+                        actual="not found in server log",
+                        repro=repro, ms=int((time.time() - t) * 1000))
+                last = {"ok": True, "output": want}
+                continue
             last = server.command(step.get("command", ""),
                                   step.get("expect", ""),
                                   step.get("timeout", 20))

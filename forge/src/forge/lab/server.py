@@ -141,9 +141,12 @@ class ServerProc:
         key = plugin.lower()
         return [l for _, l in self.lines if key in l.lower()][-50]
 
-    def errors(self) -> list[str]:
+    def errors(self, ignore: list[str] | None = None) -> list[str]:
         out = []
+        ign = ignore or []
         for _, l in self.lines:
+            if any(s in l for s in ign):
+                continue
             if ("ERROR" in l or "Exception" in l or "FAILED" in l
                     or "Could not" in l) and "ERROR]: Negative" not in l:
                 out.append(l[:300])
