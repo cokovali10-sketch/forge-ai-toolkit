@@ -127,6 +127,86 @@ def test_mcp_lists_project_tools_with_schemas():
     assert by_name["project.search"]["inputSchema"]["type"] == "object"
 
 
+def test_lab_env_create_destroy(tmp_path):
+    from forge.lab import env as _env
+    prof = _env.ServerProfile(server_jar="D:/Forge-Factority/lab-servers/purpur-1.21.11.jar")
+    e = _env.create(tmp_path, prof)
+    assert (e.server_dir / "eula.txt").is_file()
+    assert (e.artifacts_dir / "profile.json").is_file()
+    _env.destroy(e)
+    assert not e.server_dir.exists() and e.artifacts_dir.exists()
+
+
+def test_lab_install_missing_jar(tmp_path):
+    from forge.lab import env as _env
+    prof = _env.ServerProfile()
+    e = _env.create(tmp_path, prof)
+    try:
+        _env.install_plugin(e, str(tmp_path / "nope.jar"))
+        raise AssertionError("must raise")
+    except FileNotFoundError:
+        pass
+    finally:
+        _env.destroy(e, keep_artifacts=False)
+
+
+def test_lab_build_detect_and_unknown(tmp_path):
+    from forge.lab import build as _b
+    assert _b.detect(tmp_path) == "unknown"
+    r = _b.build_plugin(tmp_path, timeout=5)
+    assert r["ok"] is False and r["jar"] is None
+    (tmp_path / "pom.xml").write_text("<project/>", encoding="utf-8")
+    assert _b.detect(tmp_path) == "maven"
+
+
+def test_lab_server_missing_jar(tmp_path):
+    from forge.lab import env as _env
+    from forge.lab.server import ServerProc
+    e = _env.create(tmp_path, _env.ServerProfile(server_jar=""))
+    try:
+        s = ServerProc(e)
+        assert s.start()["ok"] is False
+        assert s.command("x")["ok"] is False
+        assert s.stop()["ok"] is True
+    finally:
+        _env.destroy(e, keep_artifacts=False)
+
+
+class _FakeServer:
+    def __init__(self, script):
+        self.script = script
+        self.i = 0
+
+    def command(self, cmd, expect="", timeout=5):
+        out = self.script[min(self.i, len(self.script) - 1)]
+        self.i += 1
+        if expect and expect not in out:
+            return {"ok": False, "error": "nope", "output": out}
+        return {"ok": True, "output": out}
+
+
+def test_lab_scenarios_pass_fail():
+    from forge.lab import scenarios as _sc
+    ok = _sc.run(_FakeServer(["plugins\nLabPing"]), _sc.plugin_load("LabPing"))
+    assert ok.status == "PASS"
+    bad = _sc.run(_FakeServer(["nothing here"]), _sc.command_check("labping", "labpong"))
+    assert bad.status == "FAIL" and bad.repro == ["> labping"]
+
+
+def test_lab_report_and_tools():
+    from forge.lab import report as _r
+    from forge.lab import tools as _t
+    rep = _r.RunReport(run_id="t1")
+    rep.add("a", True, "fine", 5)
+    rep.add("b", False, "broken", 7)
+    assert rep.passed() is False
+    assert "FAIL" in rep.markdown()
+    names = [t[0] for t in _t.TOOLS]
+    assert "lab.start_server" in names and "lab.gui_check" in names
+    ni = _t.not_implemented("lab.gui_check", _t.CLIENT_GUI_WHY)
+    assert ni["status"] == "NOT_IMPLEMENTED"
+
+
 def test_hermes_backend_honest_when_down():
     from forge.bridges.hermes import HermesBackend
     b = HermesBackend("http://127.0.0.1:1")

@@ -107,10 +107,29 @@ def build_default_registry(anvil_dir: str = "") -> Registry:
     reg.add_module(ModuleDef("core", "FORGE core tools", "0.1.0", ["forge.ping"]))
     reg.add_module(ModuleDef("project", "Workspace-confined project tools",
                              "0.1.0", [t[0] for t in TOOLS]))
+    _wire_lab(reg, local)
     if anvil_dir and Path(anvil_dir, "anvil_call.py").is_file():
         reg.add_backend("anvil", AnvilBackend(anvil_dir))
         reg.add_module(ModuleDef("anvil", "Anvil tool bridge", "0.1.0", []))
     return reg
+
+
+def _wire_lab(reg, local) -> None:
+    """Stateless lab tools only (env-bound ones stay in CLI/runner)."""
+    from ..core.registry import ToolDef
+    from ..lab import build as _b
+    from ..lab import unittests as _u
+    local.add(ToolDef("lab.detect_build", "Detect gradle/maven/javac"),
+              lambda p: {"system": _b.detect(p.get("project", "."))})
+    local.add(ToolDef("lab.build_plugin", "Clean build a plugin project"),
+              lambda p: _b.build_plugin(p.get("project", "."),
+                                        int(p.get("timeout", 900))))
+    local.add(ToolDef("lab.run_unit_tests", "Gradle test suite with summary"),
+              lambda p: _u.run_gradle_tests(p.get("project", "."),
+                                            int(p.get("timeout", 900))))
+    reg.add_module(ModuleDef("lab", "Testing Lab stateless tools", "0.1.0",
+                             ["lab.detect_build", "lab.build_plugin",
+                              "lab.run_unit_tests"]))
 
 
 def main() -> None:

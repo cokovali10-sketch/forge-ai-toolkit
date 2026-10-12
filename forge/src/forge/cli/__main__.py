@@ -32,6 +32,36 @@ def _knowledge():
     return ks
 
 
+def _lab(args: list[str]) -> int:
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    if not args or args[0] in ("-h", "--help", "help"):
+        print("usage: forge lab <detect <project>|e2e>")
+        return 0
+    if args[0] == "detect" and len(args) > 1:
+        from forge.lab import build as _b
+        print(_b.detect(args[1]))
+        return 0
+    if args[0] == "e2e":
+        import os as _os
+        from forge.lab import runner as _r
+        cands = [_os.environ.get("FORGE_JAVA21", ""),
+                 r"C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot\bin\java.exe"]
+        java_bin = next((c for c in cands if c and Path(c).is_file()), "")
+        res = _r.e2e_fixture(
+            ROOT / "lab-runs",
+            "D:/Forge-Factority/lab-servers/purpur-1.21.11.jar",
+            ROOT / "tests" / "fixture-plugin" / "src",
+            java_bin=java_bin)
+        print(_json.dumps({k: v for k, v in res.items() if k != "checks"},
+                          ensure_ascii=False, indent=2))
+        for c in res.get("checks", []):
+            print(("PASS " if c["ok"] else "FAIL ") + c["stage"])
+        return 0 if res["ok"] else 1
+    print(f"unknown lab command: {args[0]}")
+    return 2
+
+
 def _anvil_dir() -> str:
     cand = ROOT.parent / "Anvil"
     if cand.is_dir():
@@ -136,6 +166,8 @@ def main(argv: list[str] | None = None) -> int:
         print(_json.dumps(reg.call("project.inspect", {"root": args[1]}),
                           ensure_ascii=False, indent=2))
         return 0
+    if cmd == "lab":
+        return _lab(args[1:])
     if cmd == "mcp":
         sys.path.insert(0, str(ROOT / "src"))
         from forge.mcp.server import McpServer, build_default_registry

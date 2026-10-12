@@ -1,0 +1,10 @@
+name: LabPing
+version: 0.1.0
+main: com.forge.labping.LabPing
+api-version: '1.21'
+author: FORGE Testing Lab
+description: Fixture plugin for lab self-verification
+commands:
+  labping:
+    description: Replies labpong
+    usage: /labping [text]
