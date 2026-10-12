@@ -115,7 +115,8 @@ def build_default_registry(anvil_dir: str = "") -> Registry:
     return reg
 
 
-def _wire_lab(reg, local) -> None:    """Stateless lab tools only (env-bound ones stay in CLI/runner)."""
+def _wire_lab(reg, local) -> None:
+    """Stateless lab tools only (env-bound ones stay in CLI/runner)."""
     from ..core.registry import ToolDef
     from ..lab import build as _b
     from ..lab import unittests as _u
