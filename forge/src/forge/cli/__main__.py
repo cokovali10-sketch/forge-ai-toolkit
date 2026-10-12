@@ -198,6 +198,44 @@ def _bench(args: list[str]) -> int:
     return 2
 
 
+def _docs(args: list[str]) -> int:
+    """Regenerate docs/tools.md + docs/modules.md from live registry."""
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.mcp.server import build_default_registry
+    from forge.modules.manifest import load_packs
+    reg = build_default_registry(_anvil_dir())
+    lines = ["# Tool Catalog (generated — do not edit by hand)", "",
+             f"SOURCE_OF_TRUTH = registry ({len(reg.tool_owner)} tools)", ""]
+    for name in sorted(reg.tool_owner):
+        back = reg.backends.get(reg.tool_owner[name])
+        desc, schema = "?", {}
+        if back is not None and hasattr(back, "schema_of"):
+            try:
+                schema, desc = back.schema_of(name)
+            except Exception:
+                pass
+        mod = reg.tool_module.get(name, "?")
+        lvl = reg.level_of(name)
+        lines.append(f"## {name}")
+        lines.append(f"- module: {mod}, backend: {reg.tool_owner[name]}, level: {lvl}")
+        lines.append(f"- {desc}")
+        lines.append("")
+    (ROOT / "docs" / "tools.md").write_text("\n".join(lines), encoding="utf-8")
+    packs = load_packs(ROOT / "module-packs")
+    ml = ["# Module Catalog (generated)", ""]
+    for mid in sorted(packs):
+        m = packs[mid]
+        ml.append(f"## {m.id} v{m.version} — {m.name}")
+        ml.append(f"- {m.description}")
+        ml.append(f"- capabilities: {', '.join(m.capabilities)}")
+        ml.append(f"- tools: {', '.join(m.tools)}")
+        ml.append("")
+    (ROOT / "docs" / "modules.md").write_text("\n".join(ml), encoding="utf-8")
+    print(f"wrote docs/tools.md ({len(reg.tool_owner)} tools), "
+          f"docs/modules.md ({len(packs)} packs)")
+    return 0
+
+
 def _lab(args: list[str]) -> int:
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
@@ -375,6 +413,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if cmd == "lab":
         return _lab(args[1:])
+    if cmd == "docs":
+        return _docs(args[1:])
     if cmd == "bench":
         return _bench(args[1:])
     if cmd == "config":

@@ -17,7 +17,8 @@ def test_registry_local_call():
     back.add(ToolDef("echo"), lambda p: {"v": p.get("v")})
     reg.add_backend("local", back)
     reg.add_module(ModuleDef("m", "d", "0.1.0", ["echo"]))
-    assert reg.call("echo", {"v": 1}) == {"ok": True, "data": {"v": 1}}
+    assert reg.call("echo", {"v": 1})["data"] == {"v": 1}
+    assert reg.call("echo", {"v": 1})["ok"] is True
     assert reg.call("nope", {})["ok"] is False
 
 
@@ -323,6 +324,76 @@ def test_bench_unknown_check_type(tmp_path):
     from forge.bench.runner import run_task
     r = run_task({"id": "x", "checks": [{"type": "nope"}]}, tmp_path, "t")
     assert r.passed is False
+
+
+def test_envelope_shape_backward_compat():
+    from forge.mcp.server import build_default_registry
+    reg = build_default_registry()
+    ok = reg.call("forge.ping", {"echo": 1})
+    assert ok["ok"] is True and ok["data"] == {"pong": True, "echo": 1}
+    assert ok["status"] == "SUCCESS" and "duration_ms" in ok
+    bad = reg.call("nope.missing", {})
+    assert bad["ok"] is False and bad["status"] == "ERROR"
+
+
+def test_permission_denied_by_level():
+    from forge.mcp.server import build_default_registry
+    reg = build_default_registry()
+    r = reg.call("lab.build_plugin", {"project": "."}, allow_level=1)
+    assert r["ok"] is False and r["status"] == "DENIED"
+    assert "level 2" in r["error"]["message"]
+    ok = reg.call("project.tree", {"root": "."}, allow_level=0)
+    assert ok["ok"] is True
+
+
+def test_module_disable_denies_tools():
+    from forge.mcp.server import build_default_registry
+    reg = build_default_registry()
+    assert reg.is_enabled("project") is True
+    assert reg.disable("project") is True
+    assert reg.status_of("project") == "DISABLED"
+    r = reg.call("project.tree", {"root": "."})
+    assert r["ok"] is False and r["status"] == "DENIED"
+    assert reg.enable("project") is True
+    assert reg.call("project.tree", {"root": "."})["ok"] is True
+    assert reg.disable("ghost") is False
+
+
+def test_tool_timeout_reports():
+    import time as _t
+    from forge.core.registry import LocalBackend, ModuleDef, Registry, ToolDef
+    reg = Registry()
+    back = LocalBackend()
+    back.add(ToolDef("slow.op", "sleeps", level=2, timeout=1),
+             lambda p: (_t.sleep(5), {"done": True})[1])
+    reg.add_backend("local", back)
+    reg.add_module(ModuleDef("m", "d", "0.1.0", ["slow.op"]))
+    r = reg.call("slow.op", {})
+    assert r["ok"] is False and r["status"] == "TIMEOUT"
+
+
+def test_manifest_v2_compat():
+    from forge.modules.manifest import Manifest
+    old = Manifest.load(
+        __import__("pathlib").Path(__file__).resolve().parents[1]
+        / "module-packs" / "minecraft" / "module.json")
+    assert old.api_version == "1" and old.status == "DISCOVERED"
+    assert old.validate() == []
+    m = Manifest(id="x", name="X", version="1", description="d",
+                 capabilities=["c"], permissions=["p"], instructions="i",
+                 status="BOGUS")
+    assert any("bad status" in e for e in m.validate())
+
+
+def test_router_available_filter():
+    from forge.modules.manifest import load_packs, route
+    from pathlib import Path as _P
+    packs = load_packs(_P(__file__).resolve().parents[1] / "module-packs")
+    all_picks = route("minecraft plugin java", packs)
+    ids = [mid for mid, _ in all_picks]
+    assert "minecraft-expert" in ids
+    filtered = route("minecraft plugin java", packs, available={"java-expert"})
+    assert [mid for mid, _ in filtered] == ["java-expert"]
 
 
 def test_perf_parse_tps():

@@ -96,13 +96,13 @@ def build_default_registry(anvil_dir: str = "") -> Registry:
     reg = Registry()
     local = LocalBackend()
     from ..core.registry import ToolDef
-    local.add(ToolDef("forge.ping", "Liveness probe"),
+    local.add(ToolDef("forge.ping", "Liveness probe", level=0),
               lambda p: {"pong": True, "echo": p.get("echo")})
     for name, desc, schema, fn in TOOLS:
         local.add(ToolDef(name, desc, "0.1.0",
                           {"type": "object", "properties": {
                               k: {"type": "string", "description": v}
-                              for k, v in schema.items()}}), fn)
+                              for k, v in schema.items()}}, level=0), fn)
     reg.add_backend("local", local)
     reg.add_module(ModuleDef("core", "FORGE core tools", "0.1.0", ["forge.ping"]))
     reg.add_module(ModuleDef("project", "Workspace-confined project tools",
@@ -121,12 +121,14 @@ def _wire_lab(reg, local) -> None:
     from ..core.registry import ToolDef
     from ..lab import build as _b
     from ..lab import unittests as _u
-    local.add(ToolDef("lab.detect_build", "Detect gradle/maven/javac"),
+    local.add(ToolDef("lab.detect_build", "Detect gradle/maven/javac", level=0),
               lambda p: {"system": _b.detect(p.get("project", "."))})
-    local.add(ToolDef("lab.build_plugin", "Clean build a plugin project"),
+    local.add(ToolDef("lab.build_plugin", "Clean build a plugin project",
+                      level=2, timeout=900),
               lambda p: _b.build_plugin(p.get("project", "."),
                                         int(p.get("timeout", 900))))
-    local.add(ToolDef("lab.run_unit_tests", "Gradle test suite with summary"),
+    local.add(ToolDef("lab.run_unit_tests", "Gradle test suite with summary",
+                      level=2, timeout=900),
               lambda p: _u.run_gradle_tests(p.get("project", "."),
                                             int(p.get("timeout", 900))))
     reg.add_module(ModuleDef("lab", "Testing Lab stateless tools", "0.1.0",
@@ -140,11 +142,11 @@ def _wire_ui(reg, local) -> None:
     from ..ui import brief as _br
     from ..ui import components as _c
     from ..ui import strategy as _st
-    local.add(ToolDef("ui.design_brief", "NL description -> brief+strategy"),
+    local.add(ToolDef("ui.design_brief", "NL description -> brief+strategy", level=0),
               lambda p: _brief_dict(_br.from_description(p.get("text", ""))))
-    local.add(ToolDef("ui.validate_layout", "Inventory slot/action/text checks"),
+    local.add(ToolDef("ui.validate_layout", "Inventory slot/action/text checks", level=0),
               lambda p: {"errors": _c.validate_inventory(p.get("screen", {}))})
-    local.add(ToolDef("ui.check_contrast", "Text/background contrast math"),
+    local.add(ToolDef("ui.check_contrast", "Text/background contrast math", level=0),
               lambda p: {"errors": _c.validate_contrast(
                   int(str(p.get("fg", "0xFFFFFFFF")), 0),
                   int(str(p.get("bg", "0xFF000000")), 0),
@@ -194,37 +196,37 @@ def _wire_more(reg, local, anvil_dir: str) -> None:
         return {"meta": ""}
 
     local.add(ToolDef("minecraft.validate_plugin_metadata",
-                      "plugin.yml lint via Anvil"),
+                      "plugin.yml lint via Anvil", level=1),
               lambda p: _anvil().call(
                   "plugin_yml_lint",
                   {"path": _mc_meta(p.get("project", "."))["meta"] or "plugin.yml"})
               if _anvil() else {"ok": False,
                                 "error": "anvil backend not configured"})
     local.add(ToolDef("minecraft.check_permissions",
-                      "permission checks vs declarations"),
+                      "permission checks vs declarations", level=1),
               lambda p: _anvil().call(
                   "perm_audit",
                   {"src": str(_P(p.get("project", ".")) / "src")})
               if _anvil() else {"ok": False,
                                 "error": "anvil backend not configured"})
     local.add(ToolDef("minecraft.check_compatibility",
-                      "api-version vs MC via Anvil"),
+                      "api-version vs MC via Anvil", level=1),
               lambda p: _anvil().call("api_version_check", {
                   "api": p.get("api", ""), "mc": p.get("mc", "")})
               if _anvil() else {"ok": False,
                                 "error": "anvil backend not configured"})
-    local.add(ToolDef("minecraft.analyze_logs", "lifecycle+errors for a plugin"),
+    local.add(ToolDef("minecraft.analyze_logs", "lifecycle+errors for a plugin", level=1),
               lambda p: _anvil().call("log_scan", {
                   "path": p.get("log", ""), "plugin": p.get("plugin", "")})
               if _anvil() else {"ok": False,
                                 "error": "anvil backend not configured"})
-    local.add(ToolDef("knowledge.search", "FTS over FORGE facts"),
+    local.add(ToolDef("knowledge.search", "FTS over FORGE facts", level=0),
               lambda p: {"hits": _store().search(
                   p.get("query", ""), p.get("domain", ""),
                   int(p.get("limit", 5)))})
-    local.add(ToolDef("knowledge.get_fact", "Single fact by id"),
+    local.add(ToolDef("knowledge.get_fact", "Single fact by id", level=0),
               lambda p: {"fact": _store().get(int(p.get("id", -1)))})
-    local.add(ToolDef("code.review", "Static review: debt/dups/size"),
+    local.add(ToolDef("code.review", "Static review: debt/dups/size", level=0),
               lambda p: _review(p.get("root", "."),
                                int(p.get("max_files", 500))))
     reg.add_module(ModuleDef("minecraft", "Minecraft checks via Anvil", "0.1.0",

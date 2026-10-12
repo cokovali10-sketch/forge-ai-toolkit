@@ -39,12 +39,14 @@ python -m venv .venv
 - Testing Lab: сборка, unit-тесты, реальный Purpur, команды, отчёты
 - AAA Interface Engine: брифы, стратегии A/B/C/D, валидация GUI, PNG-ассеты
 - Генератор Paper-плагинов (`forge gen paper ...`)
+- Стандарт ToolResult + уровни разрешений 0–4 (`docs/permissions.md`)
+- Жизненный цикл модулей (enable/disable), генерируемые каталоги (`forge docs`)
 
 ## Статус / Status
 
-MVP + Testing Lab + UI Engine работают и покрыты тестами (`forge 0.7.x`).
-Десктоп отложен (нужен Node.js). Скриншотные тесты и автоклиент — честно
-отмечены как NOT_IMPLEMENTED.
+Ядро + Testing Lab + UI Engine работают и покрыты тестами (55 тестов).
+Десктоп отложен (нужен Node.js). Скриншоты и автоклиент честно отмечены
+как NOT_IMPLEMENTED.
 
 ## Лицензия / License
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from pathlib import Path
 
 
@@ -27,19 +28,27 @@ END;
 
 class KnowledgeStore:
     def __init__(self, path: str | Path = ":memory:") -> None:
-        self.db = sqlite3.connect(str(path))
-        self.db.executescript(SCHEMA)
+        # check_same_thread=False + explicit lock: tools run on pool threads.
+        self.db = sqlite3.connect(str(path), check_same_thread=False)
+        self.lock = threading.Lock()
+        with self.lock:
+            self.db.executescript(SCHEMA)
 
     def add(self, domain: str, title: str, body: str,
             source: str = "", version: str = "0.1.0") -> int:
-        cur = self.db.execute(
-            "INSERT INTO facts(domain,title,body,source,version) VALUES(?,?,?,?,?)",
-            (domain, title, body, source, version),
-        )
-        self.db.commit()
-        return int(cur.lastrowid)
+        with self.lock:
+            cur = self.db.execute(
+                "INSERT INTO facts(domain,title,body,source,version) VALUES(?,?,?,?,?)",
+                (domain, title, body, source, version),
+            )
+            self.db.commit()
+            return int(cur.lastrowid)
 
     def search(self, query: str, domain: str = "", limit: int = 5) -> list[dict]:
+        with self.lock:
+            return self._search_locked(query, domain, limit)
+
+    def _search_locked(self, query: str, domain: str = "", limit: int = 5) -> list[dict]:
         if domain:
             rows = self.db.execute(
                 """SELECT f.id,f.domain,f.title,f.body,f.source FROM facts_fts
@@ -60,6 +69,10 @@ class KnowledgeStore:
         ]
 
     def load_jsonl(self, path: str | Path) -> int:
+        with self.lock:
+            return self._load_locked(path)
+
+    def _load_locked(self, path: str | Path) -> int:
         n = 0
         with open(path, encoding="utf-8") as f:
             for line in f:
@@ -67,15 +80,24 @@ class KnowledgeStore:
                 if not line:
                     continue
                 o = json.loads(line)
-                self.add(o.get("domain", "general"), o.get("title", ""),
-                         o.get("body", ""), o.get("source", ""), o.get("version", "0.1.0"))
+                self.db.execute(
+                    "INSERT INTO facts(domain,title,body,source,version) VALUES(?,?,?,?,?)",
+                    (o.get("domain", "general"), o.get("title", ""),
+                     o.get("body", ""), o.get("source", ""),
+                     o.get("version", "0.1.0")))
                 n += 1
+        self.db.commit()
         return n
 
     def count(self) -> int:
-        return int(self.db.execute("SELECT COUNT(*) FROM facts").fetchone()[0])
+        with self.lock:
+            return int(self.db.execute("SELECT COUNT(*) FROM facts").fetchone()[0])
 
     def get(self, fact_id: int) -> dict | None:
+        with self.lock:
+            return self._get_locked(fact_id)
+
+    def _get_locked(self, fact_id: int) -> dict | None:
         r = self.db.execute(
             "SELECT id,domain,title,body,source FROM facts WHERE id=?",
             (fact_id,)).fetchone()
