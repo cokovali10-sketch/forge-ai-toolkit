@@ -52,10 +52,47 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         print("available: " + ", ".join(sorted(skills)) if skills else "no skills")
         return 1 if name else 0
+    if cmd == "skills":
+        from forge.skills.loader import validate_skill
+        skills = _skills()
+        sub = args[1] if len(args) > 1 else "list"
+        if sub == "list":
+            for name in sorted(skills):
+                s = skills[name]
+                print(f"{name} v{s.version} [{s.domain}] - {s.title}")
+            return 0
+        if sub == "validate":
+            bad = 0
+            for name in sorted(skills):
+                errs = validate_skill(skills[name])
+                if errs:
+                    bad += 1
+                    print(f"{name}: FAIL: {'; '.join(errs)}")
+                else:
+                    print(f"{name}: OK")
+            return 1 if bad else 0
+        print("usage: forge skills [list|validate]")
+        return 2
     if cmd == "know":
         ks = _knowledge()
         for r in ks.search(" ".join(args[1:]), limit=5):
             print(f"[{r['domain']}] {r['title']}\n{r['body'][:400]}\n")
+        return 0
+    if cmd == "route":
+        sys.path.insert(0, str(ROOT / "src"))
+        from forge.modules.manifest import load_packs, route
+        packs = load_packs(ROOT / "module-packs")
+        for mid, reasons in route(" ".join(args[1:]), packs):
+            print(f"{mid}: {'; '.join(reasons)}")
+        return 0
+    if cmd == "inspect":
+        if len(args) < 2:
+            print("usage: forge inspect <project-dir>")
+            return 2
+        reg = _registry()
+        import json as _json
+        print(_json.dumps(reg.call("project.inspect", {"root": args[1]}),
+                          ensure_ascii=False, indent=2))
         return 0
     if cmd == "mcp":
         sys.path.insert(0, str(ROOT / "src"))

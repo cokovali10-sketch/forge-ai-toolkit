@@ -1,0 +1,16 @@
+{
+  "id": "minecraft-expert",
+  "name": "Minecraft Expert",
+  "version": "0.1.0",
+  "description": "Paper/Spigot/Purpur/Fabric development: versions, APIs, GUIs, configs",
+  "tech": ["paper", "spigot", "purpur", "bukkit", "fabric", "minecraft", "plugin", "gui", "maven", "gradle", "yaml", "minimessage", "placeholderapi", "vault", "luckperms"],
+  "capabilities": ["scaffold plugin", "version compatibility check", "metadata lint", "permission audit", "config check", "listener analysis", "gui design review"],
+  "deps": ["java-expert"],
+  "instructions": "Match server Java and api-version exactly. Verify API methods against real jars. Test on live logs with boot_check.",
+  "knowledge": ["minecraft", "java", "build"],
+  "tools": ["project.inspect", "minecraft.validate_plugin_metadata", "minecraft.check_permissions"],
+  "limits": ["no invented API", "no async Bukkit access", "Fabric and Bukkit APIs never mixed"],
+  "permissions": ["read project files", "run builds", "read logs"],
+  "tests": ["metadata lint green", "boot log shows enable"],
+  "compat": ["paper>=1.20", "fabric-loader>=0.15"]
+}

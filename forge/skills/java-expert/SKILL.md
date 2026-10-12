@@ -2,6 +2,16 @@
 name: java-expert
 version: 0.1.0
 domain: java
+activate-when:
+  - task mentions Java, Gradle, Maven, JUnit, or .java files
+  - build.gradle/pom.xml present in project
+  - compilation or mapping errors (yarn/mojmap)
+verify-by:
+  - real build (gradle/maven) green, not just compile
+  - unit tests pass; versions resolved from metadata, not memory
+limits:
+  - do not guess dependency versions; resolve first
+  - do not mix business logic, storage and UI layers
 ---
 # Java Expert
 
@@ -17,7 +27,7 @@ Battle-tested rules for Java 17/21/25 + Gradle work.
 ## Mapping discipline (Minecraft/Fabric)
 - Yarn names != Mojang names. Verify every FQN against the real jar
   (javap on the mapped artifact), never from memory alone.
-- 26.x line is UNOBFUSCATED: loom 1.16 + `net.fabricmc.fabric-loom` plugin id
+- 26.x line is UNOBFUSCATED: loom 1.16.2 + plugin id net.fabricmc.fabric-loom
   + Mojang names, no Yarn (yarn/26.x is empty, intermediary is 0.0.0).
 - Input/render APIs drift between lines: KeyBinding->KeyMapping,
   DrawContext->GuiGraphicsExtractor, Screen.render->extractRenderState.
@@ -28,3 +38,10 @@ Battle-tested rules for Java 17/21/25 + Gradle work.
 - Isolate per-element failures; disable repeat offenders; log once.
 - Unit-test pure logic; treat environment flakes (locked temp dirs) as flakes:
   rerun before blaming code.
+
+## Knowledge sources
+- knowledge base domain=java/minecraft/build; official Gradle/Mojang docs first.
+- Example: MythicVisuals 26.2 port (verified in-repo pattern).
+
+## Quality bar
+- No pseudocode as final code; no hidden build errors; minimal diffs.

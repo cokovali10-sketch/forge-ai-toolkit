@@ -2,6 +2,15 @@
 name: paper-plugin-expert
 version: 0.1.0
 domain: minecraft
+activate-when:
+  - task mentions Paper/Spigot/Purpur plugin, plugin.yml, Bukkit API
+  - paper-plugin.yml or plugin.yml present
+verify-by:
+  - plugin_yml_lint + perm_audit + jar_inspect green
+  - boot_check on a real server log (load + enable lines)
+limits:
+  - match server Java and api-version exactly; no invented API methods
+  - no Bukkit API calls from async threads
 ---
 # Paper Plugin Expert
 
@@ -19,6 +28,8 @@ domain: minecraft
 - Persist player data on quit + periodic save, not only on disable.
 - MiniMessage: balance tags, escape user input, no legacy color mix.
 
-## Checks before ship
-- plugin_yml_lint, perm_audit (checks vs declarations), jar_inspect,
-  api-version vs target MC, boot_check on a real log.
+## Knowledge sources
+- knowledge base domain=minecraft; official Paper docs; Anvil mc_paper tools.
+
+## Quality bar
+- Audit pack passes; commands/config/permissions verified on a live log.

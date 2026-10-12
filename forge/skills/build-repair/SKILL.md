@@ -2,6 +2,16 @@
 name: build-repair
 version: 0.1.0
 domain: build
+activate-when:
+  - any compilation, test, or packaging failure
+  - after every file change that must be verified
+verify-by:
+  - full build green + tests green, twice if flake suspected
+  - error text gone from fresh output (not just scrolled away)
+limits:
+  - max 5 fix cycles per issue, then stop and report
+  - never present partial build as success
+  - never rewrite working components to fix symptoms
 ---
 # Build-Repair Loop
 
@@ -18,3 +28,9 @@ rebuild -> rerun tests -> verify.
 - Bisect ruthlessly: empty entrypoint -> minimal init -> pieces, until the
   failing piece is isolated. Guessing is forbidden; experiments are cheap.
 - Log every fix with the exact error text so the knowledge base grows.
+
+## Knowledge sources
+- knowledge base domain=build; compiler docs; prior fix log.
+
+## Quality bar
+- Fix is minimal, explained by the error text, verified by a clean rebuild.

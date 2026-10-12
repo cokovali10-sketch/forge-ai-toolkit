@@ -33,11 +33,16 @@ class McpServer:
         if method == "tools/list":
             tools = []
             for name, owner in sorted(self.registry.tool_owner.items()):
-                tools.append({
-                    "name": name,
-                    "description": f"FORGE tool via backend '{owner}'",
-                    "inputSchema": {"type": "object"},
-                })
+                schema: dict = {"type": "object"}
+                desc = f"FORGE tool via backend '{owner}'"
+                back = self.registry.backends.get(owner)
+                if back is not None and hasattr(back, "schema_of"):
+                    try:
+                        schema, desc = back.schema_of(name)
+                    except Exception:
+                        pass
+                tools.append({"name": name, "description": desc,
+                              "inputSchema": schema})
             return self._ok(msg_id, {"tools": tools})
         if method == "tools/call":
             name = params.get("name", "")
@@ -86,14 +91,22 @@ class McpServer:
 def build_default_registry(anvil_dir: str = "") -> Registry:
     """Registry wired for CLI/MCP smoke use. Anvil attached when found."""
     from ..core.registry import AnvilBackend, LocalBackend, ModuleDef
+    from ..project.inspect import TOOLS
     from pathlib import Path
     reg = Registry()
     local = LocalBackend()
     from ..core.registry import ToolDef
     local.add(ToolDef("forge.ping", "Liveness probe"),
               lambda p: {"pong": True, "echo": p.get("echo")})
+    for name, desc, schema, fn in TOOLS:
+        local.add(ToolDef(name, desc, "0.1.0",
+                          {"type": "object", "properties": {
+                              k: {"type": "string", "description": v}
+                              for k, v in schema.items()}}), fn)
     reg.add_backend("local", local)
     reg.add_module(ModuleDef("core", "FORGE core tools", "0.1.0", ["forge.ping"]))
+    reg.add_module(ModuleDef("project", "Workspace-confined project tools",
+                             "0.1.0", [t[0] for t in TOOLS]))
     if anvil_dir and Path(anvil_dir, "anvil_call.py").is_file():
         reg.add_backend("anvil", AnvilBackend(anvil_dir))
         reg.add_module(ModuleDef("anvil", "Anvil tool bridge", "0.1.0", []))

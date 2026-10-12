@@ -22,6 +22,7 @@ class ToolDef:
     name: str
     description: str = ""
     version: str = "0.1.0"
+    schema: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -54,6 +55,10 @@ class LocalBackend(ToolBackend):
 
     def tools(self) -> list[ToolDef]:
         return [t for t, _ in self._tools.values()]
+
+    def schema_of(self, tool: str) -> tuple[dict, str]:
+        t, _ = self._tools[tool]
+        return t.schema or {"type": "object"}, t.description or tool
 
 
 class AnvilBackend(ToolBackend):
