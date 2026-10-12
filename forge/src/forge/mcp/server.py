@@ -10,7 +10,7 @@ import json
 import sys
 from typing import Any
 
-from ..core.registry import Registry
+from ..core.registry import ModuleDef, Registry
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_INFO = {"name": "forge-mcp", "version": "0.1.0"}
