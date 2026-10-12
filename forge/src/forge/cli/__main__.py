@@ -32,11 +32,47 @@ def _knowledge():
     return ks
 
 
+def _ui(args: list[str]) -> int:
+    sys.path.insert(0, str(ROOT / "src"))
+    if not args or args[0] in ("-h", "--help", "help"):
+        print("usage: forge ui <brief \"...\"|pack>")
+        return 0
+    from forge.ui import assets as _a
+    from forge.ui import brief as _b
+    from forge.ui import strategy as _s
+    from forge.ui import system as _sys
+    if args[0] == "brief" and len(args) > 1:
+        import json as _json
+        text = " ".join(args[1:])
+        br = _b.from_description(text)
+        st = _s.select(br.needs_client_mod, br.needs_resource_pack)
+        print(_json.dumps({"style": br.style, "screens": br.screens,
+                           "features": br.features, "strategy": st["key"],
+                           "strategy_name": st["name"],
+                           "needs_client_mod": br.needs_client_mod,
+                           "needs_resource_pack": br.needs_resource_pack,
+                           "notes": br.notes}, ensure_ascii=False, indent=2))
+        return 0
+    if args[0] == "pack":
+        out = ROOT / "examples" / "mythic-shop" / "resourcepack"
+        manifest = _a.build_pack(_sys.preset_mythic(), out)
+        _a.pack_mcmeta("Mythic dark-red theme", out)
+        import json as _json
+        print(_json.dumps({"assets": len(manifest["assets"]), "out": str(out)},
+                          ensure_ascii=False))
+        return 0
+    print(f"unknown ui command: {args[0]}")
+    return 2
+
+
 def _lab(args: list[str]) -> int:
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
     if not args or args[0] in ("-h", "--help", "help"):
         print("usage: forge lab <detect <project>|e2e>")
+        return 0
+        from forge.lab import build as _b
+        print(_b.detect(args[1]))
         return 0
     if args[0] == "detect" and len(args) > 1:
         from forge.lab import build as _b
@@ -168,6 +204,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if cmd == "lab":
         return _lab(args[1:])
+    if cmd == "ui":
+        return _ui(args[1:])
     if cmd == "mcp":
         sys.path.insert(0, str(ROOT / "src"))
         from forge.mcp.server import McpServer, build_default_registry

@@ -1,0 +1,10 @@
+name: MythicShop
+version: 0.1.0
+main: com.mythic.shop.MythicShop
+api-version: '1.21'
+author: FORGE Demo
+description: Premium demo shop (dark-red theme)
+commands:
+  mythicshop:
+    description: Open the shop
+    usage: /mythicshop

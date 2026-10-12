@@ -229,3 +229,77 @@ def test_router_respects_limit_and_empty():
     packs = load_packs(_P(__file__).resolve().parents[1] / "module-packs")
     assert route("zzz-no-match-qqq", packs) == []
     assert len(route("java gradle minecraft plugin build test", packs, limit=2)) <= 2
+
+
+def test_ui_brief_ru_en():
+    from forge.ui import brief as _b
+    ru = _b.from_description("Премиальный аукцион dark fantasy с поиском и страницами")
+    assert ru.style == "dark fantasy" and "auction" in ru.screens
+    assert "search" in ru.features
+    en = _b.from_description("minimal shop")
+    assert en.screens == ["shop"] and en.style == "minimal premium"
+
+
+def test_ui_strategy_select():
+    from forge.ui import strategy as _s
+    assert _s.select(False, False)["key"] == "A"
+    assert _s.select(False, True)["key"] == "B"
+    assert _s.select(True, False)["key"] == "C"
+    assert _s.select(True, True)["key"] == "D"
+    assert _s.select(False, False)["fallback"].startswith("works")
+
+
+def test_ui_system_validate():
+    from forge.ui import system as _sys
+    assert _sys.validate(_sys.preset_mythic()) == []
+    bad = dict(_sys.preset_mythic())
+    bad["colors"] = {"accent": "red"}
+    assert any("bad color" in e for e in _sys.validate(bad))
+    assert any("missing section" in e for e in _sys.validate({}))
+
+
+def test_ui_components_inventory():
+    from forge.ui import components as _c
+    good = {"title": "Shop", "size": 27, "components": [
+        {"kind": "panel", "slots": list(range(9))},
+        {"kind": "item_slot", "slots": [10, 12]},
+        {"kind": "button", "slots": [26], "text": "Close", "action": "close"}]}
+    assert _c.validate_inventory(good) == []
+    bad = {"title": "x" * 40, "size": 27, "components": [
+        {"kind": "button", "slots": [99], "text": "Broken"},
+        {"kind": "item_slot", "slots": [10]},
+        {"kind": "button", "slots": [10], "text": "Clash", "action": "x"}]}
+    errs = _c.validate_inventory(bad)
+    assert any("outside" in e for e in errs)
+    assert any("shared" in e for e in errs)
+    assert any("without action" in e for e in errs)
+    assert _c.validate_inventory({"title": "t", "size": 13, "components": []})
+
+
+def test_ui_contrast_math():
+    from forge.ui import components as _c
+    assert _c.contrast(0xFFFFFFFF, 0xFF000000) > 15.0
+    assert _c.validate_contrast(0xFFFFFFFF, 0xFF000000, "t") == []
+    assert _c.validate_contrast(0xFF777777, 0xFF888888, "t")
+
+
+def test_ui_assets_pack(tmp_path):
+    from forge.ui import assets as _a
+    from forge.ui import system as _sys
+    m = _a.build_pack(_sys.preset_mythic(), tmp_path / "rp")
+    assert len(m["assets"]) == 5
+    for a in m["assets"]:
+        assert a["bytes"] > 50
+    mcmeta = _a.pack_mcmeta("demo", tmp_path / "rp")
+    assert mcmeta.endswith("pack.mcmeta")
+    import json as _j
+    assert _j.loads((tmp_path / "rp" / "manifest.json").read_text())["pack"]
+
+
+def test_demo_layout_valid():
+    import json as _j
+    from forge.ui import components as _c
+    from pathlib import Path as _P
+    layout = _j.loads((_P(__file__).resolve().parents[1] / "examples"
+                       / "mythic-shop" / "layout.json").read_text(encoding="utf-8"))
+    assert _c.validate_inventory(layout) == []

@@ -1,0 +1,76 @@
+{
+  "pack": "mythic-dark-red",
+  "minecraft": "1.21.11",
+  "assets": [
+    {
+      "id": "panel",
+      "use": "menu background",
+      "path": "D:\\Forge-Factority\\forge\\examples\\mythic-shop\\resourcepack\\textures\\panel.png",
+      "size": [
+        256,
+        128
+      ],
+      "mode": "RGBA",
+      "bytes": 531,
+      "format": "PNG",
+      "source": "forge-asset-pipeline",
+      "license": "generated, free to use"
+    },
+    {
+      "id": "button_normal",
+      "use": "button state",
+      "path": "D:\\Forge-Factority\\forge\\examples\\mythic-shop\\resourcepack\\textures\\button_normal.png",
+      "size": [
+        120,
+        20
+      ],
+      "mode": "RGBA",
+      "bytes": 179,
+      "format": "PNG",
+      "source": "forge-asset-pipeline",
+      "license": "generated, free to use"
+    },
+    {
+      "id": "button_hover",
+      "use": "button state",
+      "path": "D:\\Forge-Factority\\forge\\examples\\mythic-shop\\resourcepack\\textures\\button_hover.png",
+      "size": [
+        120,
+        20
+      ],
+      "mode": "RGBA",
+      "bytes": 175,
+      "format": "PNG",
+      "source": "forge-asset-pipeline",
+      "license": "generated, free to use"
+    },
+    {
+      "id": "button_disabled",
+      "use": "button state",
+      "path": "D:\\Forge-Factority\\forge\\examples\\mythic-shop\\resourcepack\\textures\\button_disabled.png",
+      "size": [
+        120,
+        20
+      ],
+      "mode": "RGBA",
+      "bytes": 181,
+      "format": "PNG",
+      "source": "forge-asset-pipeline",
+      "license": "generated, free to use"
+    },
+    {
+      "id": "divider",
+      "use": "section separator",
+      "path": "D:\\Forge-Factority\\forge\\examples\\mythic-shop\\resourcepack\\textures\\divider.png",
+      "size": [
+        200,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 97,
+      "format": "PNG",
+      "source": "forge-asset-pipeline",
+      "license": "generated, free to use"
+    }
+  ]
+}

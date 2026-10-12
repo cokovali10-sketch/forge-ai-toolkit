@@ -1,0 +1,18 @@
+# MythicShop demo config
+items:
+  god-apple:
+    slot: 10
+    item: ENCHANTED_GOLDEN_APPLE
+    price: 32
+  netherite-sword:
+    slot: 12
+    item: NETHERITE_SWORD
+    price: 24
+  totem:
+    slot: 14
+    item: TOTEM_OF_UNDYING
+    price: 16
+  elytra:
+    slot: 16
+    item: ELYTRA
+    price: 48

@@ -73,6 +73,38 @@ def e2e_fixture(lab_root: str | Path, server_jar: str, fixture_src: str | Path,
     return _finish(environment, srv, rep, t)
 
 
+def e2e_jar(lab_root: str | Path, server_jar: str, plugin_jar: str,
+            scenarios: list, java_bin: str = "", timeout_boot: int = 420) -> dict:
+    """Boot a prebuilt plugin jar and run scenarios against it."""
+    rep = _report.RunReport(run_id="pending")
+    t = time.time()
+    profile = _env.ServerProfile(server_jar=server_jar, timeout_sec=timeout_boot)
+    environment = _env.create(lab_root, profile)
+    rep.run_id = environment.run_id
+    srv = _srv.ServerProc(environment, _srv.find_java(java_bin))
+    try:
+        name = _env.install_plugin(environment, plugin_jar)
+        rep.add("install-plugin", True, name)
+    except Exception as e:
+        rep.add("install-plugin", False, f"{type(e).__name__}: {e}")
+        return _finish(environment, srv, rep, t)
+    st = srv.start()
+    rep.add("start-server", st["ok"], str(st.get("pid", st.get("error", ""))))
+    if not st["ok"]:
+        return _finish(environment, srv, rep, t)
+    wr = srv.wait_ready()
+    rep.add("wait-ready", wr["ok"], wr.get("error", "Done seen"))
+    if not wr["ok"]:
+        return _finish(environment, srv, rep, t)
+    for sc in scenarios:
+        r = _sc.run(srv, sc)
+        rep.add(f"scenario:{r.name}", r.status == "PASS",
+                (r.actual or "")[:800] + (" | " + r.expected if r.status != "PASS" else ""), r.ms)
+    errs = srv.errors()
+    rep.add("no-server-errors", not errs, "; ".join(errs[:5]) or "log clean")
+    return _finish(environment, srv, rep, t)
+
+
 def _finish(environment, srv, rep, t0) -> dict:
     logs = ""
     try:

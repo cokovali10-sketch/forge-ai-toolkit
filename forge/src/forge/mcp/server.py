@@ -108,14 +108,14 @@ def build_default_registry(anvil_dir: str = "") -> Registry:
     reg.add_module(ModuleDef("project", "Workspace-confined project tools",
                              "0.1.0", [t[0] for t in TOOLS]))
     _wire_lab(reg, local)
+    _wire_ui(reg, local)
     if anvil_dir and Path(anvil_dir, "anvil_call.py").is_file():
         reg.add_backend("anvil", AnvilBackend(anvil_dir))
         reg.add_module(ModuleDef("anvil", "Anvil tool bridge", "0.1.0", []))
     return reg
 
 
-def _wire_lab(reg, local) -> None:
-    """Stateless lab tools only (env-bound ones stay in CLI/runner)."""
+def _wire_lab(reg, local) -> None:    """Stateless lab tools only (env-bound ones stay in CLI/runner)."""
     from ..core.registry import ToolDef
     from ..lab import build as _b
     from ..lab import unittests as _u
@@ -130,6 +130,34 @@ def _wire_lab(reg, local) -> None:
     reg.add_module(ModuleDef("lab", "Testing Lab stateless tools", "0.1.0",
                              ["lab.detect_build", "lab.build_plugin",
                               "lab.run_unit_tests"]))
+
+
+def _wire_ui(reg, local) -> None:
+    """Real UI tools: brief, strategy, layout validation, pack structure."""
+    from ..core.registry import ToolDef
+    from ..ui import brief as _br
+    from ..ui import components as _c
+    from ..ui import strategy as _st
+    local.add(ToolDef("ui.design_brief", "NL description -> brief+strategy"),
+              lambda p: _brief_dict(_br.from_description(p.get("text", ""))))
+    local.add(ToolDef("ui.validate_layout", "Inventory slot/action/text checks"),
+              lambda p: {"errors": _c.validate_inventory(p.get("screen", {}))})
+    local.add(ToolDef("ui.check_contrast", "Text/background contrast math"),
+              lambda p: {"errors": _c.validate_contrast(
+                  int(str(p.get("fg", "0xFFFFFFFF")), 0),
+                  int(str(p.get("bg", "0xFF000000")), 0),
+                  p.get("where", "text"))})
+    reg.add_module(ModuleDef("ui", "AAA Interface Engine tools", "0.1.0",
+                             ["ui.design_brief", "ui.validate_layout",
+                              "ui.check_contrast"]))
+
+
+def _brief_dict(br) -> dict:
+    from ..ui import strategy as _st
+    st = _st.select(br.needs_client_mod, br.needs_resource_pack)
+    return {"style": br.style, "screens": br.screens, "features": br.features,
+            "strategy": st["key"], "strategy_name": st["name"],
+            "notes": br.notes}
 
 
 def main() -> None:
