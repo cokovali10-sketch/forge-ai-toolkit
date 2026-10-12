@@ -49,7 +49,12 @@ class LocalBackend(ToolBackend):
         if tool not in self._tools:
             return {"ok": False, "error": f"unknown tool: {tool}"}
         try:
-            return {"ok": True, "data": self._tools[tool][1](params)}
+            res = self._tools[tool][1](params)
+            # Functions returning an {"ok": ...} envelope pass through
+            # (lets bridges surface backend failures honestly).
+            if isinstance(res, dict) and "ok" in res:
+                return res
+            return {"ok": True, "data": res}
         except Exception as e:  # never leak tracebacks across the protocol
             return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
