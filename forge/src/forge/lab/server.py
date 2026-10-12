@@ -142,14 +142,23 @@ class ServerProc:
         return [l for _, l in self.lines if key in l.lower()][-50]
 
     def errors(self, ignore: list[str] | None = None) -> list[str]:
-        out = []
         ign = ignore or []
+        blocks: list[str] = []
+        cur: list[str] = []
         for _, l in self.lines:
-            if any(s in l for s in ign):
+            if l.startswith("\t") or l.lstrip().startswith(("at ", "Caused by:")):
+                if cur:
+                    cur.append(l.strip()[:200])
                 continue
+            if cur:
+                blocks.append(" | ".join(cur))
+                cur = []
             if ("ERROR" in l or "Exception" in l or "FAILED" in l
                     or "Could not" in l) and "ERROR]: Negative" not in l:
-                out.append(l[:300])
+                cur = [l[:300]]
+        if cur:
+            blocks.append(" | ".join(cur))
+        out = [b for b in blocks if not any(s in b for s in ign)]
         return out[:30]
 
 

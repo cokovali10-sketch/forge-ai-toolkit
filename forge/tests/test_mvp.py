@@ -266,6 +266,30 @@ def test_lab_errors_allowlist():
             _env.destroy(e, keep_artifacts=False)
 
 
+def test_lab_errors_group_stack_lines():
+    from forge.lab.server import ServerProc
+    from forge.lab import env as _env
+    import tempfile as _t
+    with _t.TemporaryDirectory() as tmp:
+        e = _env.create(tmp, _env.ServerProfile())
+        try:
+            s = ServerProc(e)
+            s.lines = [
+                (0.0, "[Essentials] ERROR: zip file closed"),
+                (0.1, "Caused by: java.lang.IllegalStateException: zip"),
+                (0.2, "\tat java.base/java.util.zip.ZipFile.close"),
+                (0.3, "[MyPlugin] ERROR: real problem"),
+                (0.4, "Caused by: java.lang.NullPointerException: x"),
+            ]
+            all_errs = s.errors()
+            assert len(all_errs) == 2
+            assert any("NullPointerException" in b for b in all_errs)
+            kept = s.errors(ignore=["[Essentials]"])
+            assert len(kept) == 1 and "MyPlugin" in kept[0]
+        finally:
+            _env.destroy(e, keep_artifacts=False)
+
+
 def test_bench_good_bad():
     from forge.bench.runner import load_task, run_task
     from pathlib import Path as _P
@@ -299,6 +323,55 @@ def test_bench_unknown_check_type(tmp_path):
     from forge.bench.runner import run_task
     r = run_task({"id": "x", "checks": [{"type": "nope"}]}, tmp_path, "t")
     assert r.passed is False
+
+
+def test_perf_parse_tps():
+    from forge.lab import perf as _p
+    assert _p.parse_tps("TPS from last 1m, 5m, 15m: 20.0, 20.0, 20.0")["tps"] == 20.0
+    r = _p.parse_tps("Current: 19.8 TPS, 6.2 MSPT (target 50)")
+    assert r["tps"] == 19.8 and r["mspt"] == 6.2
+    assert _p.parse_tps("no numbers here") == {}
+
+
+class _FuzzFake:
+    def __init__(self, outputs):
+        self.outputs = outputs
+        self.lines = [(0.0, l) for out in outputs for l in out.splitlines()]
+        self.i = 0
+
+    def command(self, cmd, expect="", timeout=5):
+        if cmd == "boom":
+            raise RuntimeError("dead")
+        out = self.outputs[min(self.i, len(self.outputs) - 1)]
+        self.i += 1
+        base = len(self.lines)
+        for l in out.splitlines():
+            self.lines.append((0.0, l))
+        _ = base
+        if expect and expect not in out:
+            return {"ok": False, "error": "missing", "output": out}
+        return {"ok": True, "output": out}
+
+
+def test_fuzz_commands_clean_and_dirty():
+    from forge.lab import fuzz as _fz
+    clean = _FuzzFake(["ok"])
+    r = _fz.fuzz_commands(clean, ["ping"], ignore=[])
+    assert r["ok"] and r["tried"] > 5
+    dirty = _FuzzFake(["ok\njava.lang.Exception: bad"])
+    r2 = _fz.fuzz_commands(dirty, ["ping"], ignore=[])
+    assert r2["ok"] is False and r2["failed"]
+    dead = _FuzzFake(["ok"])
+    r3 = _fz.fuzz_commands(dead, ["boom"], ignore=[])
+    assert r3["ok"] is False
+
+
+def test_soak_stable_and_drift():
+    from forge.lab import fuzz as _fz
+    s = _FuzzFake(["same"])
+    assert _fz.soak(s, "x", "", 3)["ok"] is True
+    d = _FuzzFake(["one", "two", "three"])
+    assert _fz.soak(d, "x", "", 3)["ok"] is False
 
 
 def test_mcp_more_tools_no_anvil():

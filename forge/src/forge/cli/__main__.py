@@ -202,7 +202,8 @@ def _lab(args: list[str]) -> int:
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
     if not args or args[0] in ("-h", "--help", "help"):
-        print("usage: forge lab <detect <project>|e2e>")
+        print("usage: forge lab <detect <project>|e2e|mirror --jar F --deps A,B "
+              "--fuzz c1,c2 --config-rel P --marker M [--load]>")
         return 0
     if args[0] == "detect" and len(args) > 1:
         from forge.lab import build as _b
@@ -211,19 +212,59 @@ def _lab(args: list[str]) -> int:
     if args[0] == "e2e":
         import os as _os
         from forge.lab import runner as _r
-        cands = [_os.environ.get("FORGE_JAVA21", ""),
-                 r"C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot\bin\java.exe"]
-        java_bin = next((c for c in cands if c and Path(c).is_file()), "")
         res = _r.e2e_fixture(
             ROOT / "lab-runs",
             "D:/Forge-Factority/lab-servers/purpur-1.21.11.jar",
             ROOT / "tests" / "fixture-plugin" / "src",
-            java_bin=java_bin)
-        print(_json.dumps({k: v for k, v in res.items() if k != "checks"},
-                          ensure_ascii=False, indent=2))
-        for c in res.get("checks", []):
-            print(("PASS " if c["ok"] else "FAIL ") + c["stage"])
-        return 0 if res["ok"] else 1
+            java_bin=_java21())
+        return _show(res)
+    if args[0] == "mirror":
+        import os as _os
+        from forge.lab import runner as _r
+        o = _kv(args[1:])
+        deps = [d for d in o.get("deps", "").split(",") if d]
+        fuzz = [c for c in o.get("fuzz", "").split(",") if c]
+        ign = [s for s in o.get("ignore", "[Essentials],Essentials v,Nag author,plugin classloader for Essentials").split(",") if s]
+        bad = ["", ":\t:\nnot yaml at all",
+               "economy:\n  tax-percent: -50\n  min-price: banana\n"]
+        res = _r.mirror(
+            ROOT / "lab-runs", "D:/Forge-Factority/lab-servers/purpur-1.21.11.jar",
+            o.get("jar", ""), java_bin=_java21(), extra_jars=deps,
+            ignore_errors=ign, fuzz_commands=fuzz or None,
+            config_rel=o.get("config-rel", ""), bad_configs=bad,
+            enable_marker=o.get("marker", ""),
+            with_load=o.get("load", "0") == "1")
+        return _show(res)
+    print(f"unknown lab command: {args[0]}")
+    return 2
+
+
+def _java21() -> str:
+    import os as _os
+    cands = [_os.environ.get("FORGE_JAVA21", ""),
+             r"C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot\bin\java.exe"]
+    return next((c for c in cands if c and Path(c).is_file()), "")
+
+
+def _kv(args: list[str]) -> dict:
+    out: dict = {}
+    i = 0
+    while i < len(args):
+        if args[i].startswith("--") and i + 1 < len(args):
+            out[args[i][2:]] = args[i + 1]
+            i += 2
+        else:
+            i += 1
+    return out
+
+
+def _show(res: dict) -> int:
+    import json as _json
+    print(_json.dumps({k: v for k, v in res.items() if k != "checks"},
+                      ensure_ascii=False, indent=2))
+    for c in res.get("checks", []):
+        print(("PASS " if c["ok"] else "FAIL ") + c["stage"])
+    return 0 if res["ok"] else 1
     print(f"unknown lab command: {args[0]}")
     return 2
 
