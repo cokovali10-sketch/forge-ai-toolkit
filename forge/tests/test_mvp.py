@@ -303,3 +303,26 @@ def test_demo_layout_valid():
     layout = _j.loads((_P(__file__).resolve().parents[1] / "examples"
                        / "mythic-shop" / "layout.json").read_text(encoding="utf-8"))
     assert _c.validate_inventory(layout) == []
+
+
+def test_gen_paper_valid(tmp_path):
+    from forge.gen import paper_plugin as _g
+    res = _g.generate(tmp_path / "out", "ClanCore", "com.forge.clans", "clan")
+    assert res["main_class"] == "com.forge.clans.ClanCore"
+    main = (tmp_path / "out" / "src" / "com" / "forge" / "clans" / "ClanCore.java")
+    assert main.is_file()
+    text = main.read_text(encoding="utf-8")
+    assert "onEnable" in text and "PlayerJoinEvent" in text
+    yml = (tmp_path / "out" / "src" / "plugin.yml").read_text(encoding="utf-8")
+    assert "main: com.forge.clans.ClanCore" in yml
+
+
+def test_gen_paper_rejects_bad_input(tmp_path):
+    from forge.gen import paper_plugin as _g
+    import pytest as _pt
+    with _pt.raises(ValueError):
+        _g.generate(tmp_path / "o1", "123bad", "com.x", "ok")
+    with _pt.raises(ValueError):
+        _g.generate(tmp_path / "o2", "Ok", "Bad-Package", "ok")
+    with _pt.raises(ValueError):
+        _g.generate(tmp_path / "o3", "Ok", "com.x", "BAD CMD")

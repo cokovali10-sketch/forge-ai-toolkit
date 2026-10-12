@@ -65,14 +65,39 @@ def _ui(args: list[str]) -> int:
     return 2
 
 
+def _gen(args: list[str]) -> int:
+    sys.path.insert(0, str(ROOT / "src"))
+    if not args or args[0] in ("-h", "--help", "help"):
+        print("usage: forge gen paper --name X [--package P] [--command C] [--out DIR]")
+        return 0
+    if args[0] != "paper":
+        print(f"unknown generator: {args[0]}")
+        return 2
+    import json as _json
+    opts = {"name": "Demo", "package": "com.forge.demo", "command": "hello",
+            "out": str(ROOT / "examples" / "gen-demo")}
+    i = 1
+    while i < len(args):
+        if args[i].startswith("--") and i + 1 < len(args):
+            opts[args[i][2:].replace("-", "_")] = args[i + 1]
+            i += 2
+        else:
+            i += 1
+    from forge.gen import paper_plugin as _g
+    try:
+        res = _g.generate(opts["out"], opts["name"], opts["package"], opts["command"])
+    except ValueError as e:
+        print(f"bad options: {e}")
+        return 2
+    print(_json.dumps(res, ensure_ascii=False, indent=2))
+    return 0
+
+
 def _lab(args: list[str]) -> int:
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
     if not args or args[0] in ("-h", "--help", "help"):
         print("usage: forge lab <detect <project>|e2e>")
-        return 0
-        from forge.lab import build as _b
-        print(_b.detect(args[1]))
         return 0
     if args[0] == "detect" and len(args) > 1:
         from forge.lab import build as _b
@@ -204,6 +229,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if cmd == "lab":
         return _lab(args[1:])
+    if cmd == "gen":
+        return _gen(args[1:])
     if cmd == "ui":
         return _ui(args[1:])
     if cmd == "mcp":

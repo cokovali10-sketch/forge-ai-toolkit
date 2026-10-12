@@ -1,0 +1,3 @@
+# ClanCore config
+join-message: "Welcome %player%!"
+command-reply: "Hello from ClanCore!"
