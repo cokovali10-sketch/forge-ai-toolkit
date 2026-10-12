@@ -32,6 +32,48 @@ def _knowledge():
     return ks
 
 
+def _anvil_dir() -> str:
+    cand = ROOT.parent / "Anvil"
+    if cand.is_dir():
+        return str(cand)
+    if Path("D:/PortfolioProjects/Anvil").is_dir():
+        return "D:/PortfolioProjects/Anvil"
+    return ""
+
+
+def _anvil_tool_names() -> list[str]:
+    import subprocess
+    d = _anvil_dir()
+    if not d:
+        return []
+    try:
+        out = subprocess.run(
+            [sys.executable, "-m", "anvil", "list"], capture_output=True,
+            text=True, timeout=60, cwd=d)
+        names = []
+        for line in (out.stdout or "").splitlines():
+            if " - " in line:
+                names.append(line.split(" - ", 1)[0].strip().split(".")[-1])
+        return sorted(set(names))
+    except Exception:
+        return []
+
+
+def _call_any(tool: str, params: dict):
+    reg = _registry()
+    res = reg.call(tool, params)
+    if res.get("ok") or "unknown tool" not in str(res.get("error", "")):
+        return res
+    if tool.startswith("hermes."):
+        from forge.bridges.hermes import HermesBackend
+        return HermesBackend().call(tool, params)
+    from forge.core.registry import AnvilBackend
+    d = _anvil_dir()
+    if not d:
+        return res
+    return AnvilBackend(d).call(tool, params)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = argv if argv is not None else sys.argv[1:]
     if not args or args[0] in ("-h", "--help", "help"):
@@ -98,6 +140,31 @@ def main(argv: list[str] | None = None) -> int:
         sys.path.insert(0, str(ROOT / "src"))
         from forge.mcp.server import McpServer, build_default_registry
         McpServer(build_default_registry("D:/PortfolioProjects/Anvil")).serve()
+        return 0
+    if cmd == "tools":
+        reg = _registry()
+        names = sorted(reg.tool_owner)
+        print(f"registry: {len(names)} tools")
+        for n in names:
+            print(f"  {n} [{reg.tool_owner[n]}]")
+        for extra in _anvil_tool_names():
+            if extra not in names:
+                print(f"  {extra} [anvil]")
+        return 0
+    if cmd == "call":
+        if len(args) < 2:
+            print("usage: forge call <tool> [json-params]")
+            return 2
+        import json as _json
+        tool = args[1]
+        raw = args[2] if len(args) > 2 else "{}"
+        try:
+            params = _json.loads(raw) if not raw.startswith("@") else _json.loads(
+                open(raw[1:], encoding="utf-8").read())
+        except Exception as e:
+            print(f"bad params: {e}")
+            return 2
+        print(_json.dumps(_call_any(tool, params), ensure_ascii=False, indent=2))
         return 0
     print(f"unknown command: {cmd}")
     return 2

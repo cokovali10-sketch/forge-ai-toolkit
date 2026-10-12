@@ -125,3 +125,27 @@ def test_mcp_lists_project_tools_with_schemas():
     by_name = {t["name"]: t for t in tools["result"]["tools"]}
     assert "project.search" in by_name
     assert by_name["project.search"]["inputSchema"]["type"] == "object"
+
+
+def test_hermes_backend_honest_when_down():
+    from forge.bridges.hermes import HermesBackend
+    b = HermesBackend("http://127.0.0.1:1")
+    assert b.available() is False
+    res = b.call("hermes.health", {})
+    assert res["ok"] is False and "Hermes server" in res["error"]
+    assert b.call("nope", {})["ok"] is False
+
+
+def test_anvil_backend_missing_dir():
+    from forge.core.registry import AnvilBackend
+    b = AnvilBackend("D:/definitely-not-here-xyz")
+    res = b.call("lang_test", {})
+    assert res["ok"] is False
+
+
+def test_router_respects_limit_and_empty():
+    from forge.modules.manifest import load_packs, route
+    from pathlib import Path as _P
+    packs = load_packs(_P(__file__).resolve().parents[1] / "module-packs")
+    assert route("zzz-no-match-qqq", packs) == []
+    assert len(route("java gradle minecraft plugin build test", packs, limit=2)) <= 2

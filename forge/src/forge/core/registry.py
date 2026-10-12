@@ -68,6 +68,12 @@ class AnvilBackend(ToolBackend):
         self.anvil_dir = Path(anvil_dir)
         self.timeout = timeout
 
+    def schema_of(self, tool: str) -> tuple[dict, str]:
+        return ({"type": "object",
+                 "properties": {"_params": {"type": "string",
+                                            "description": "tool params as JSON"}}},
+                f"Anvil tool {tool} (params vary per tool)")
+
     def call(self, tool: str, params: dict[str, Any]) -> dict[str, Any]:
         script = self.anvil_dir / "anvil_call.py"
         if not script.is_file():

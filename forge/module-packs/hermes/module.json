@@ -1,0 +1,16 @@
+{
+  "id": "hermes",
+  "name": "Hermes Services",
+  "version": "0.1.0",
+  "description": "Memory, workflows, code intel and vision via Hermes HTTP server",
+  "tech": ["http", "memory", "workflows", "vision", "agents"],
+  "capabilities": ["memory recall", "workflow matching", "semantic code search", "screenshot vision"],
+  "deps": [],
+  "instructions": "Server must run at 127.0.0.1:8765. Every call fails cleanly when down; never fake results.",
+  "knowledge": [],
+  "tools": ["hermes.health", "hermes.recall", "hermes.match_workflow", "hermes.code_search"],
+  "limits": ["requires running server", "uses Hermes workspace sandbox, not FORGE root"],
+  "permissions": ["http to localhost"],
+  "tests": ["unavailable-path returns clean error"],
+  "compat": ["hermes>=5.0"]
+}

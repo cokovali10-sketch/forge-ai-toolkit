@@ -1,0 +1,16 @@
+{
+  "id": "anvil",
+  "name": "Anvil Tools",
+  "version": "0.1.0",
+  "description": "120 local tools: code, git, builds, logs, mc-paper audits, network",
+  "tech": ["python", "cli", "gradle", "git", "paper", "yaml"],
+  "capabilities": ["run tests", "guarded commits", "log audits", "jar inspect", "modrinth lookup"],
+  "deps": [],
+  "instructions": "Call via anvil_call.py subprocess with a params JSON file. Never push; commits are local only.",
+  "knowledge": ["build"],
+  "tools": ["lang_test", "git_commit", "log_errors", "code_search", "modrinth_version"],
+  "limits": ["subprocess only; no shared memory", "long builds need generous timeouts"],
+  "permissions": ["run local tools", "read/write project files via tools"],
+  "tests": ["anvil self-tests 32/32"],
+  "compat": ["python>=3.10"]
+}
