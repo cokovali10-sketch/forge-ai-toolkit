@@ -27,6 +27,15 @@ class Manifest:
     permissions: list[str] = field(default_factory=list)
     tests: list[str] = field(default_factory=list)
     compat: list[str] = field(default_factory=list)
+    # v2 (master spec): all optional, backward compatible
+    api_version: str = "1"
+    status: str = "DISCOVERED"
+    skills: list[str] = field(default_factory=list)
+    required_permissions: list[str] = field(default_factory=list)
+    configuration_schema: dict = field(default_factory=dict)
+    healthcheck: str = ""
+    test_suite: str = ""
+    supported_platforms: list[str] = field(default_factory=list)
 
     @staticmethod
     def load(path: str | Path) -> "Manifest":
@@ -47,6 +56,9 @@ class Manifest:
             errs.append("no capabilities")
         if not self.permissions:
             errs.append("no permissions declared")
+        if self.status not in ("DISCOVERED", "INSTALLED", "ENABLED", "DISABLED",
+                               "DEGRADED", "FAILED", "INCOMPATIBLE"):
+            errs.append(f"bad status: {self.status}")
         return errs
 
 
@@ -71,12 +83,16 @@ def load_packs(packs_dir: str | Path) -> dict[str, Manifest]:
 STOP = frozenset("""and with for the from that this into out via per use using used make made create add fix bug feature error issue problem project code file files test tests run build server client game mod mods api app web page panel menu button screen data base user users new old all any each every other same such than then there they their them those very via will would should could must shall may might can have has had does did are was were been being our your its it of to in on at as by or nor not but if then so yet""".split())
 
 
-def route(task: str, packs: dict[str, Manifest], limit: int = 3) -> list[tuple[str, list[str]]]:
-    """Score manifests by keyword overlap; return (id, reasons), best first."""
+def route(task: str, packs: dict[str, Manifest], limit: int = 3,
+          available: set[str] | None = None) -> list[tuple[str, list[str]]]:
+    """Score manifests by keyword overlap; return (id, reasons), best first.
+    available: restrict to these ids (dead/disabled modules filtered out)."""
     words = {w.strip(".,!?()[]{}\"'").lower() for w in task.split()
              if len(w) > 2} - STOP
     scored: list[tuple[int, str, list[str]]] = []
     for m in packs.values():
+        if available is not None and m.id not in available:
+            continue
         hay = " ".join(m.tech + m.capabilities + [m.description, m.instructions]).lower()
         hits = sorted({w for w in words if w in hay})
         if hits:
