@@ -61,6 +61,20 @@ def _ui(args: list[str]) -> int:
         print(_json.dumps({"assets": len(manifest["assets"]), "out": str(out)},
                           ensure_ascii=False))
         return 0
+    if args[0] == "iterate":
+        import json as _json
+        from forge.ui import system as _sys2
+        out = ROOT / "examples" / "mythic-shop" / "iteration"
+        res = _a.iterate(_sys2.preset_mythic(), out)
+        print(_json.dumps(res["best"], ensure_ascii=False))
+        return 0
+    if args[0] == "import" and len(args) > 2:
+        import json as _json
+        from forge.ui import system as _sys3
+        res = _a.import_graphics(args[1], args[2], _sys3.preset_mythic())
+        print(_json.dumps({"accepted": len(res["accepted"]),
+                           "rejected": res["rejected"]}, ensure_ascii=False))
+        return 0
     print(f"unknown ui command: {args[0]}")
     return 2
 
@@ -91,6 +105,57 @@ def _gen(args: list[str]) -> int:
         return 2
     print(_json.dumps(res, ensure_ascii=False, indent=2))
     return 0
+
+
+def _config(args: list[str]) -> int:
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.config.settings import example, load
+    if args and args[0] == "example":
+        print(example())
+        return 0
+    cfg, warnings = load()
+    print(_json.dumps({"config": cfg, "warnings": warnings},
+                      ensure_ascii=False, indent=2))
+    return 0
+
+
+def _fix(args: list[str]) -> int:
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.fix import loop as _fx
+    if not args or args[0] in ("-h", "--help", "help"):
+        print("usage: forge fix <checkpoint|diff|rollback|cycle> --project DIR [-- cmd...]")
+        return 0
+    sub, rest = args[0], args[1:]
+    proj = "."
+    cmd: list[str] = []
+    if "--project" in rest:
+        i = rest.index("--project")
+        if i + 1 < len(rest):
+            proj = rest[i + 1]
+    if "--" in rest:
+        cmd = rest[rest.index("--") + 1:]
+    if sub == "checkpoint":
+        print(_json.dumps(_fx.checkpoint(proj), ensure_ascii=False, indent=2))
+        return 0
+    if sub == "diff":
+        print(_json.dumps(_fx.diff(proj), ensure_ascii=False, indent=2))
+        return 0
+    if sub == "rollback":
+        r = _fx.rollback(proj)
+        print(_json.dumps(r, ensure_ascii=False, indent=2))
+        return 0 if r["ok"] else 1
+    if sub == "cycle":
+        if not cmd:
+            print("usage: forge fix cycle --project DIR -- <check-cmd...>")
+            return 2
+        r = _fx.cycle(proj, cmd)
+        print(_json.dumps({k: v for k, v in r.items()},
+                          ensure_ascii=False, indent=2)[:3000])
+        return 0 if r["ok"] else 1
+    print(f"unknown fix command: {sub}")
+    return 2
 
 
 def _bench(args: list[str]) -> int:
@@ -263,6 +328,10 @@ def main(argv: list[str] | None = None) -> int:
         return _lab(args[1:])
     if cmd == "bench":
         return _bench(args[1:])
+    if cmd == "config":
+        return _config(args[1:])
+    if cmd == "fix":
+        return _fix(args[1:])
     if cmd == "gen":
         return _gen(args[1:])
     if cmd == "ui":

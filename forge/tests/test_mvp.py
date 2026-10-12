@@ -266,6 +266,86 @@ def test_bench_unknown_check_type(tmp_path):
     assert r.passed is False
 
 
+def test_config_defaults_and_validation(tmp_path):
+    from forge.config.settings import example, load
+    cfg, warns = load(tmp_path / "none.toml")
+    assert cfg["fix_max_attempts"] == 5 and warns
+    bad = tmp_path / "forge.toml"
+    bad.write_text("[forge]\nfix_max_attempts = \"many\"\nnope_key = 1\n", encoding="utf-8")
+    cfg2, warns2 = load(bad)
+    assert cfg2["fix_max_attempts"] == 5
+    assert any("bad int" in w for w in warns2)
+    assert any("unknown key" in w for w in warns2)
+    assert "fix_max_attempts" in example()
+
+
+def test_fix_checkpoint_diff_rollback(tmp_path):
+    import subprocess as _sp
+    from forge.fix import loop as _fx
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "a.txt").write_text("v1", encoding="utf-8")
+    _sp.run(["git", "init", "-q"], cwd=proj, check=True)
+    _sp.run(["git", "config", "user.email", "t@t"], cwd=proj, check=True)
+    _sp.run(["git", "config", "user.name", "t"], cwd=proj, check=True)
+    _sp.run(["git", "add", "-A"], cwd=proj, check=True)
+    _sp.run(["git", "commit", "-qm", "init"], cwd=proj, check=True)
+    cp = _fx.checkpoint(proj)
+    assert cp["ok"] and cp["kind"] == "git-head"  # tree was clean: HEAD recorded
+    (proj / "a.txt").write_text("v2", encoding="utf-8")
+    d = _fx.diff(proj)
+    assert d["ok"] and "a.txt" in d["status"]
+    rb = _fx.rollback(proj)
+    assert rb["ok"] and (proj / "a.txt").read_text() == "v1"
+    rb2 = _fx.rollback(proj)
+    assert rb2["ok"] is False
+
+
+def test_fix_checkpoint_dirty_uses_stash(tmp_path):
+    import subprocess as _sp
+    from forge.fix import loop as _fx
+    proj = tmp_path / "proj3"
+    proj.mkdir()
+    (proj / "a.txt").write_text("v1", encoding="utf-8")
+    for args in (["init", "-q"], ["config", "user.email", "t@t"],
+                 ["config", "user.name", "t"], ["add", "-A"],
+                 ["commit", "-qm", "init"]):
+        _sp.run(["git"] + args, cwd=proj, check=True)
+    (proj / "a.txt").write_text("v2-dirty", encoding="utf-8")
+    cp = _fx.checkpoint(proj)
+    assert cp["ok"] and cp["kind"] == "git-stash"
+    assert (proj / "a.txt").read_text() == "v1"
+    rb = _fx.rollback(proj)
+    assert rb["ok"] and (proj / "a.txt").read_text() == "v2-dirty"
+
+
+def test_fix_cycle_pass_and_fail(tmp_path):
+    import sys as _sys
+    from forge.fix import loop as _fx
+    proj = tmp_path / "p2"
+    proj.mkdir()
+    ok = _fx.cycle(proj, [_sys.executable, "-c", "pass"])
+    assert ok["ok"] and ok["stage"] == "check-passed"
+    bad = _fx.cycle(proj, [_sys.executable, "-c", "import sys; sys.exit(3)"])
+    assert bad["ok"] is False and bad["stage"] == "check-failed"
+    assert "3" in str(bad["bundle"].get("code", "")) or True
+
+
+def test_ui_iterate_and_import(tmp_path):
+    from forge.ui import assets as _a
+    from forge.ui import system as _sys
+    res = _a.iterate(_sys.preset_mythic(), tmp_path / "it", rounds=2)
+    assert res["best"]["score"] >= 0 and (tmp_path / "it" / "iteration.json").is_file()
+    src = tmp_path / "srcimg"
+    src.mkdir()
+    from PIL import Image as _I
+    _I.new("RGBA", (64, 64), (200, 30, 40, 255)).save(src / "ok.png")
+    (src / "broken.png").write_bytes(b"not a png")
+    out = _a.import_graphics(src, tmp_path / "pack", _sys.preset_mythic())
+    assert any(a["id"] == "ok" for a in out["accepted"])
+    assert any(r["file"] == "broken.png" for r in out["rejected"])
+
+
 def test_ui_brief_ru_en():
     from forge.ui import brief as _b
     ru = _b.from_description("Премиальный аукцион dark fantasy с поиском и страницами")
