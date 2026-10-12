@@ -231,6 +231,41 @@ def test_router_respects_limit_and_empty():
     assert len(route("java gradle minecraft plugin build test", packs, limit=2)) <= 2
 
 
+def test_bench_good_bad():
+    from forge.bench.runner import load_task, run_task
+    from pathlib import Path as _P
+    base = _P(__file__).resolve().parents[1] / "benchmarks" / "tasks"
+    for tid, sub in (("config-defaults", None), ("plugin-scaffold", None)):
+        t = load_task(base / f"{tid}.json")
+        assert run_task(t, base / tid / "good", "t").passed is True
+        assert run_task(t, base / tid / "bad", "t").passed is False
+
+
+def test_bench_javac_good_bad():
+    import shutil as _sh
+    from forge.bench.runner import load_task, run_task
+    from pathlib import Path as _P
+    javac = _sh.which("javac")
+    if javac is None:
+        cand = _P(r"C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot\bin\javac.exe")
+        javac = str(cand) if cand.is_file() else None
+    if javac is None:
+        import pytest as _pt
+        _pt.skip("no javac available")
+    import os as _os
+    _os.environ["FORGE_JAVAC"] = javac
+    base = _P(__file__).resolve().parents[1] / "benchmarks" / "tasks"
+    t = load_task(base / "javac-fix.json")
+    assert run_task(t, base / "javac-fix" / "good", "t").passed is True
+    assert run_task(t, base / "javac-fix" / "bad", "t").passed is False
+
+
+def test_bench_unknown_check_type(tmp_path):
+    from forge.bench.runner import run_task
+    r = run_task({"id": "x", "checks": [{"type": "nope"}]}, tmp_path, "t")
+    assert r.passed is False
+
+
 def test_ui_brief_ru_en():
     from forge.ui import brief as _b
     ru = _b.from_description("Премиальный аукцион dark fantasy с поиском и страницами")

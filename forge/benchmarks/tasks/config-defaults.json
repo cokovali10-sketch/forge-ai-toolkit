@@ -1,0 +1,5 @@
+{"id": "config-defaults", "title": "plugin.yml has required keys",
+ "checks": [{"type": "contains", "path": "plugin.yml", "regex": "(?m)^name:"},
+  {"type": "contains", "path": "plugin.yml", "regex": "(?m)^version:"},
+  {"type": "contains", "path": "plugin.yml", "regex": "(?m)^main:"},
+  {"type": "contains", "path": "plugin.yml", "regex": "(?m)^api-version:"}]}

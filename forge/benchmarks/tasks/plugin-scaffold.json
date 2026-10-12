@@ -1,0 +1,6 @@
+{"id": "plugin-scaffold", "title": "Paper plugin scaffold is complete",
+ "checks": [{"type": "exists", "path": "src/plugin.yml"},
+  {"type": "contains", "path": "src/plugin.yml", "regex": "main:\\s+\\S+"},
+  {"type": "contains", "path": "src/plugin.yml", "regex": "api-version"},
+  {"type": "exists", "path": "src/com/forge/clans/ClanCore.java"},
+  {"type": "contains", "path": "src/com/forge/clans/ClanCore.java", "regex": "onEnable"}]}

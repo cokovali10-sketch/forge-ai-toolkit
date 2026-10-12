@@ -1,0 +1,2 @@
+{"id": "javac-fix", "title": "Java sources compile",
+ "checks": [{"type": "javac", "glob": "*.java", "javac": "$FORGE_JAVAC", "timeout": 120}]}

@@ -93,6 +93,38 @@ def _gen(args: list[str]) -> int:
     return 0
 
 
+def _bench(args: list[str]) -> int:
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.bench.runner import load_task, run_suite, run_task
+    from pathlib import Path as _P
+    tasks = ROOT / "benchmarks" / "tasks"
+    if not args or args[0] in ("-h", "--help", "help", "list"):
+        for f in sorted(tasks.glob("*.json")):
+            t = load_task(f)
+            print(f"{t.get('id')}: {t.get('title')} ({len(t.get('checks', []))} checks)")
+        return 0
+    if args[0] == "run" and len(args) > 2:
+        agent = "manual"
+        rest = list(args[1:])
+        if rest and rest[0].startswith("--agent="):
+            agent = rest.pop(0).split("=", 1)[1]
+        if len(rest) != 2:
+            print("usage: forge bench run [--agent=X] <task|all> <candidate-dir>")
+            return 2
+        task_id, candidate = rest
+        if task_id in ("all", "*"):
+            res = run_suite(tasks, candidate, agent)
+        else:
+            r = run_task(load_task(tasks / f"{task_id}.json"), candidate, agent)
+            res = {"agent": agent, "total": 1, "passed": 1 if r.passed else 0,
+                   "failed": 0 if r.passed else 1, "results": [task_id]}
+        print(_json.dumps(res, ensure_ascii=False, indent=2))
+        return 0 if res["failed"] == 0 else 1
+    print("usage: forge bench [list|run [--agent=X] <task|all> <candidate-dir>]")
+    return 2
+
+
 def _lab(args: list[str]) -> int:
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
@@ -229,6 +261,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if cmd == "lab":
         return _lab(args[1:])
+    if cmd == "bench":
+        return _bench(args[1:])
     if cmd == "gen":
         return _gen(args[1:])
     if cmd == "ui":
