@@ -4,9 +4,10 @@
 
 **[🇷🇺 Читать на русском](./README_RU.md) · [🏠 Hub](./README.md)**
 
-*External toolkit for AI agents: check conveyor, MCP server, testing lab,
-knowledge base. No model training, no paid APIs, no hallucinated results —
-only verifiable tools.*
+*A tool for general development of any projects in any languages:
+check conveyor, MCP server, language experts, object editor,
+knowledge base — plus a testing lab for Minecraft. No model training,
+no paid APIs, no hallucinated results — only verifiable tools.*
 
 </div>
 

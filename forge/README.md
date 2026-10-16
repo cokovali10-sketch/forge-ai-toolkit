@@ -43,7 +43,7 @@
 
 | 🇷🇺 Русский | 🇬🇧 English |
 |---|---|
-| FORGE подключается к твоему ИИ-агенту и даёт ему руки: 32 своих инструмента + 120 Anvil + ~200 Hermes, конвейер проверок, тестовую лабораторию с настоящим сервером и базу знаний. Без обучения моделей, без платных API, без выдуманных результатов. | FORGE plugs into your AI agent and gives it hands: 32 native tools + 120 Anvil + ~200 Hermes ones, a check conveyor, a testing lab with a real server, and a knowledge base. No model training, no paid APIs, no hallucinated results. |
+| FORGE подключается к твоему ИИ-агенту и даёт ему руки: конвейер проверок для **любых проектов на любых языках** (Python, JS, Rust, C++, Go, Java...), 32 своих инструмента + 120 Anvil + ~200 Hermes, редактор объектов, база знаний, а для Minecraft — бонусом настоящая тестовая лаборатория с живым сервером. Без обучения моделей, без платных API, без выдуманных результатов. | FORGE plugs into your AI agent and gives it hands: a check conveyor for **any projects in any languages** (Python, JS, Rust, C++, Go, Java...), 32 native tools + 120 Anvil + ~200 Hermes ones, an object editor, a knowledge base — plus a real live-server testing lab for Minecraft. No model training, no paid APIs, no hallucinated results. |
 
 ## Людям · For humans
 
