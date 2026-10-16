@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- langs: python/javascript/rust/cpp/go modules (detect/lint/test/scaffold),
+  `forge lang` CLI, `5/6` pipe stage, `lang.*` MCP tools
+- review: 4MB cap, `# forge-ignore` line suppressions, `--changed` hold-the-line
+
+## 0.11.0
 - pipe: conveyor `forge pipe run` (headless JSON + exit codes + checkpoints/resume)
   and `forge pipe window` (tkinter, dark theme, stage details, preload)
 - quality.review: `.forge-suppress.json` suppressions (reason required, visible in report)

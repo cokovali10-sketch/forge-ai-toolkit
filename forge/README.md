@@ -71,6 +71,23 @@ python -m venv .venv
 `SCOREBOARD.md` перегенерируется каждым прогоном. Только явный запуск —
 никакой автоматики.
 
+## Языковые модули
+
+По одному эксперту на язык — `python`, `javascript`, `rust`, `cpp`, `go`
+(Go — мой выбор: у тебя треть портфолио на нём):
+
+```bat
+.venv\Scripts\python -m forge.cli lang detect <dir>
+.venv\Scripts\python -m forge.cli lang lint go <dir>
+.venv\Scripts\python -m forge.cli lang scaffold rust myapp ./out
+```
+
+Каждый: `detect` (маркеры) / `lint` (синтаксис: py_compile, node --check,
+cargo check, g++ -fsyntax-only, gofmt+vet) / `test` (pytest, npm test,
+cargo test, ctest, go test) / `scaffold` (минимальный проект).
+Правила честные (подсмотрены у Trunk): тулчейна нет = WARNING, а не FAIL;
+стадия конвейера `5/6 Языки проекта`; MCP-инструменты `lang.*`.
+
 ## Безопасность конвейера
 
 - Только чтение чужих проектов: обход с лимитами (30 000 файлов), игнор

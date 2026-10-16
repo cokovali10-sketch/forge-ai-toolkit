@@ -124,7 +124,7 @@ def test_mcp_pipe_tools(tmp_path):
     names = sorted(reg.tool_owner)
     assert "pipe.stages" in names and "pipe.run" in names and "pipe.status" in names
     lst = reg.call("pipe.stages", {})
-    assert [s["name"] for s in lst["data"]["stages"]] == ["inspect", "review", "skills", "knowledge", "lab-e2e"]
+    assert [s["name"] for s in lst["data"]["stages"]] == ["inspect", "review", "skills", "knowledge", "langs", "lab-e2e"]
     rep = reg.call("pipe.run", {"root": str(tmp_path), "only": "inspect"})
     assert rep["data"]["status"] == "SUCCESS"
     assert [s["name"] for s in rep["data"]["stages"]] == ["inspect"]
@@ -473,3 +473,44 @@ def test_arena_records_and_renders(tmp_path):
     with open(board, "a", encoding="utf-8") as f:
         f.write("garbage{{{\n")
     assert len(_a.load_board(board)) == 3
+
+
+def test_forge_ignore_and_size_cap(tmp_path):
+    import importlib
+    _r = importlib.import_module("forge.quality.review")
+    from forge.quality.review import review
+    assert hasattr(_r, "MAX_FILE_BYTES") and hasattr(_r, "IGNORE_MARK")
+    (tmp_path / "a.py").write_text(
+        "# TODO: real\n# TODO: quiet # forge-ignore\n"
+        "# TODO: other # forge-ignore: empty-catch\n", encoding="utf-8")
+    r = review(tmp_path)
+    got = [f["detail"] for f in r["findings"] if f["rule"] == "debt-marker"]
+    assert len(got) == 2 and any("real" in d for d in got)  # 1 тихий, 1 чужое правило
+    big = tmp_path / "big.py"
+    big.write_bytes(b"# TODO: huge\n" + b"x" * (5 * 1024 * 1024))
+    r2 = review(tmp_path)
+    assert all("big.py" not in f["file"] for f in r2["findings"])
+
+
+def test_hold_the_line_git(tmp_path):
+    import subprocess as _sp
+    from forge.pipe.stages import git_changed, stage_review
+    assert git_changed(tmp_path) is None  # не репозиторий
+    env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+    import os as _os
+    e = dict(_os.environ, **env)
+    (tmp_path / "a.py").write_text("# TODO: old\n", encoding="utf-8")
+    (tmp_path / "b.py").write_text("x = 1\n", encoding="utf-8")
+    _sp.run(["git", "init", "-q"], cwd=tmp_path, env=e, check=True)
+    _sp.run(["git", "add", "."], cwd=tmp_path, env=e, check=True)
+    _sp.run(["git", "commit", "-qm", "init"], cwd=tmp_path, env=e, check=True)
+    with open(tmp_path / "b.py", "a", encoding="utf-8") as f:
+        f.write("# TODO: new\n")
+    ch = git_changed(tmp_path)
+    assert ch == {"b.py"}
+    res = stage_review({"target": str(tmp_path), "forge_root": str(tmp_path),
+                        "only": ch})
+    assert res.status == "FAILED"
+    files = {f["file"] for f in res.result["findings"]}
+    assert files == {"b.py"}  # старый TODO в a.py не тронут

@@ -422,11 +422,48 @@ def _know_mine(args: list[str]) -> int:
     return 0
 
 
+def _lang(args: list[str]) -> int:
+    """forge lang detect <dir> | lint|test <id> [dir] | scaffold <id> <name> <out>."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.langs import LANGS
+    if not args or args[0] in ("-h", "--help", "help"):
+        print("usage: forge lang detect [dir]")
+        print("       forge lang lint|test <python|javascript|rust|cpp|go> [dir]")
+        print("       forge lang scaffold <id> <name> <out-dir>")
+        return 0
+    cmd = args[0]
+    if cmd == "detect":
+        target = args[1] if len(args) > 1 else "."
+        print(_json.dumps({lid: mod.detect(target) for lid, mod in LANGS.items()
+                           if mod.detect(target).get("present")},
+                          ensure_ascii=False, indent=2))
+        return 0
+    if cmd in ("lint", "test"):
+        if len(args) < 2 or args[1] not in LANGS:
+            print(f"unknown language (есть: {','.join(LANGS)})")
+            return 2
+        target = args[2] if len(args) > 2 else "."
+        res = getattr(LANGS[args[1]], cmd)(target)
+        print(_json.dumps(res.envelope(), ensure_ascii=False, indent=2))
+        return 0 if res.status == "SUCCESS" else 1
+    if cmd == "scaffold":
+        if len(args) < 4 or args[1] not in LANGS:
+            print("usage: forge lang scaffold <id> <name> <out-dir>")
+            return 2
+        print(_json.dumps(LANGS[args[1]].scaffold(args[2], args[3]),
+                          ensure_ascii=False, indent=2))
+        return 0
+    print(f"unknown lang command: {cmd}")
+    return 2
+
+
 def _pipe(args: list[str]) -> int:
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
     if not args or args[0] in ("-h", "--help", "help") or args[0] not in ("run", "window", "watch", "heal", "init-ci", "all"):
-        print("usage: forge pipe run <dir> [--json] [--resume] [--report PATH] [--only inspect,review] [--heavy] [--serial] [--sarif PATH] [--no-plugins]")
+        print("usage: forge pipe run <dir> [--json] [--resume] [--report PATH] [--only inspect,review] [--heavy] [--serial] [--sarif PATH] [--no-plugins] [--changed]")
+        print("       run = быстрые параллельно (--serial = строго по очереди)")
         print("       run = быстрые параллельно (--serial = строго по очереди)")
         print("       forge pipe window [dir] [--resume]  (окно: только быстрые стадии)")
         print("       forge pipe watch <dir> [--only ...] [--interval S]")
@@ -435,9 +472,10 @@ def _pipe(args: list[str]) -> int:
         print("       forge pipe all <dir> [--json] [--clean]  (все подпроекты разом)")
         print("run = headless для ИИ (окна нет), window = окно для человека,")
         print("watch = слежка, heal = страховка + прогон + пакеты ремонта")
+        print("--changed = hold-the-line: ревью только изменённых файлов (git)")
         return 0 if args and args[0] in ("-h", "--help", "help") else 2
     from forge.pipe.runner import PipeRunner, exit_code
-    from forge.pipe.stages import ALL_STAGES, DEFAULT_STAGES, HEAVY_STAGES
+    from forge.pipe.stages import ALL_STAGES, DEFAULT_STAGES, HEAVY_STAGES, git_changed
     mode = args[0]
     rest = args[1:]
     target = next((a for a in rest if not a.startswith("--")), ".")
@@ -488,6 +526,15 @@ def _pipe(args: list[str]) -> int:
         if plug:
             print(f"плагины стадий: {', '.join(s.name for s in plug)}")
         return stages + plug
+
+    base_ctx: dict = {"target": target, "forge_root": str(ROOT)}
+    if "--changed" in rest:
+        ch = git_changed(target)
+        if ch is None:
+            print("не git — проверяю всё целиком")
+        else:
+            base_ctx["only"] = ch
+            print(f"hold-the-line: изменено файлов: {len(ch)}")
 
     if mode == "init-ci":
         wf = Path(target) / ".github" / "workflows" / "forge.yml"
@@ -558,7 +605,7 @@ def _pipe(args: list[str]) -> int:
             return int(e.code or 2)
 
         def _once(reason: str = "старт") -> None:
-            runner = PipeRunner(stages, {"target": target, "forge_root": str(ROOT)},
+            runner = PipeRunner(stages, dict(base_ctx),
                                 checkpoint=str(Path(target) / "forge-pipe-checkpoint.json"))
             rep = runner.run(resume=False)
             print(f"[{reason}] {rep.status} за {rep.duration_ms}мс: "
@@ -588,7 +635,7 @@ def _pipe(args: list[str]) -> int:
         stages = _with_plugins(_select())
     except SystemExit as e:
         return int(e.code or 2)
-    runner = PipeRunner(stages, {"target": target, "forge_root": str(ROOT)},
+    runner = PipeRunner(stages, dict(base_ctx),
                         checkpoint=str(Path(target) / "forge-pipe-checkpoint.json"))
     report = runner.run(resume=resume, serial=serial)
     out = report.to_dict()
@@ -676,6 +723,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if cmd == "lab":
         return _lab(args[1:])
+    if cmd == "lang":
+        return _lang(args[1:])
     if cmd == "pipe":
         return _pipe(args[1:])
     if cmd == "docs":

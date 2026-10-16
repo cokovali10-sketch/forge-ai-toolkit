@@ -66,6 +66,8 @@ def tree_hash(root: str | Path, exts: set[str] | None = None) -> str:
 
 
 CODE_EXTS = {".py", ".java", ".js", ".ts", ".tsx", ".kt", ".go", ".rs"}
+LANG_EXTS = CODE_EXTS | {".jsx", ".mjs", ".cjs", ".cpp", ".hpp", ".cc",
+                         ".hh", ".c", ".h"}
 
 
 def _supp_hash(target: str | Path) -> str:
@@ -134,7 +136,7 @@ def stage_review(ctx: dict[str, Any]) -> ToolResult:
             supp = _json.loads(sp.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             supp = []
-    res = timed(review, ctx["target"], 500, supp)
+    res = timed(review, ctx["target"], 500, supp, ctx.get("only"))
     if not res.ok:
         return res
     data = res.result if isinstance(res.result, dict) else {}
@@ -184,19 +186,85 @@ def stage_knowledge(ctx: dict[str, Any]) -> ToolResult:
     return r
 
 
-DEFAULT_STAGES: list[Stage] = [    Stage("inspect", "1/4 Осмотр проекта", stage_inspect, 60.0,
+def git_changed(target: str | Path) -> set[str] | None:
+    """Изменённые файлы (staged + unstaged + untracked). None = не git."""
+    import subprocess
+    try:
+        r = subprocess.run(["git", "status", "--short"], capture_output=True,
+                           text=True, timeout=30, cwd=str(target))
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if r.returncode != 0:
+        return None
+    out = set()
+    for line in r.stdout.splitlines():
+        p = line[3:].strip().strip('"')
+        if " -> " in p:  # rename: берём новое имя
+            p = p.split(" -> ")[-1].strip()
+        if p:
+            out.add(p.replace("\\", "/"))
+    return out
+
+
+def _review_fp(ctx: dict[str, Any]) -> str:
+    only = ctx.get("only")
+    if only is not None:
+        h = hashlib.sha1()
+        base = Path(ctx["target"])
+        for rel in sorted(only):
+            try:
+                h.update(f"{rel}|{(base / rel).stat().st_mtime_ns}\n".encode())
+            except OSError:
+                h.update(f"{rel}|gone\n".encode())
+        return "changed:" + h.hexdigest()[:16]
+    return tree_hash(ctx["target"], CODE_EXTS) + _supp_hash(ctx["target"])
+
+def stage_langs(ctx: dict[str, Any]) -> ToolResult:
+    """Языки проекта: detect -> lint каждого найденного. Ошибка синтаксиса = FAIL,
+    нет тулчейна = warning. Дешёвый и честный gate перед тяжёлыми стадиями."""
+    warns: list[str] = []
+
+    def run() -> dict:
+        from forge.langs import LANGS
+        found: dict[str, Any] = {}
+        problems: list[str] = []
+        for lid, mod in LANGS.items():
+            d = mod.detect(ctx["target"])
+            if not d.get("present"):
+                continue
+            found[lid] = {"markers": d.get("markers", []),
+                          "files": d.get("files", 0)}
+            r = mod.lint(ctx["target"])
+            warns.extend(f"{lid}: {w}" for w in r.warnings)
+            if r.status != "SUCCESS":
+                detail = (r.error or {}).get("message", r.status) if isinstance(r.error, dict) else r.status
+                problems.append(f"{lid}: {detail}"[:400])
+        if problems:
+            raise RuntimeError("; ".join(problems)[:1500])
+        return {"languages": found}
+    r = timed(run)
+    if r.ok and warns:
+        r.warnings = warns[:12]
+    return r
+
+
+DEFAULT_STAGES: list[Stage] = [
+    Stage("inspect", "1/6 Осмотр проекта", stage_inspect, 60.0,
           notes="структура, языки, сборка",
           fingerprint=lambda c: tree_hash(c["target"])),
-    Stage("review", "2/4 Ревью кода", stage_review, 180.0,
+    Stage("review", "2/6 Ревью кода", stage_review, 180.0,
           notes="confirmed = FAIL",
-          fingerprint=lambda c: tree_hash(c["target"], CODE_EXTS) + _supp_hash(c["target"])),
-    Stage("skills", "3/4 Проверка скиллов", stage_skills, 60.0,
+          fingerprint=lambda c: _review_fp(c)),
+    Stage("skills", "3/6 Проверка скиллов", stage_skills, 60.0,
           notes="все скиллы должны валидироваться",
           fingerprint=lambda c: tree_hash(Path(c["forge_root"]) / "skills")),
-    Stage("knowledge", "4/4 База знаний", stage_knowledge, 60.0,
+    Stage("knowledge", "4/6 База знаний", stage_knowledge, 60.0,
           allow_fail=True, notes="предупреждает, не валит",
           fingerprint=lambda c: tree_hash(Path(c["forge_root"]) / "knowledge",
                                            {".jsonl"})),
+    Stage("langs", "5/6 Языки проекта", stage_langs, 600.0,
+          notes="lint найденных языков (python/js/rust/cpp/go)",
+          fingerprint=lambda c: tree_hash(c["target"], LANG_EXTS)),
 ]
 
 
@@ -234,7 +302,7 @@ def stage_lab_e2e(ctx: dict[str, Any]) -> ToolResult:
 
 
 HEAVY_STAGES: list[Stage] = [
-    Stage("lab-e2e", "5/5 Lab E2E (тяжёлая)", stage_lab_e2e, 1500.0,
+    Stage("lab-e2e", "6/6 Lab E2E (тяжёлая)", stage_lab_e2e, 1500.0,
           notes="Purpur + JDK21, минуты; только --heavy",
           fingerprint=lambda c: tree_hash(
               Path(c["forge_root"]) / "tests" / "fixture-plugin",

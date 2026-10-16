@@ -109,6 +109,7 @@ def build_default_registry(anvil_dir: str = "") -> Registry:
                              "0.1.0", [t[0] for t in TOOLS]))
     _wire_lab(reg, local)
     _wire_ui(reg, local)
+    _wire_langs(reg, local)
     _wire_pipe(reg, local)
     _wire_more(reg, local, anvil_dir)
     if anvil_dir and Path(anvil_dir, "anvil_call.py").is_file():
@@ -135,6 +136,33 @@ def _wire_lab(reg, local) -> None:
     reg.add_module(ModuleDef("lab", "Testing Lab stateless tools", "0.1.0",
                              ["lab.detect_build", "lab.build_plugin",
                               "lab.run_unit_tests"]))
+
+
+def _wire_langs(reg, local) -> None:
+    """Language modules as MCP tools: detect/lint/test/scaffold per language."""
+    from ..core.registry import ToolDef
+    from ..langs import LANGS
+
+    def _mod(p: dict) -> tuple[str, Any]:
+        lid = str(p.get("lang", ""))
+        if lid not in LANGS:
+            raise ValueError(f"unknown language (есть: {','.join(LANGS)})")
+        return lid, LANGS[lid]
+
+    local.add(ToolDef("lang.detect_all", "Detect languages in a dir", level=0),
+              lambda p: {"languages":
+                         {lid: mod.detect(str(p.get("root", ".")))
+                          for lid, mod in LANGS.items()}})
+    local.add(ToolDef("lang.lint", "Syntax-check a language in a dir", level=1),
+              lambda p: _mod(p)[1].lint(str(p.get("root", "."))).envelope())
+    local.add(ToolDef("lang.test", "Run a language test suite", level=1),
+              lambda p: _mod(p)[1].test(str(p.get("root", "."))).envelope())
+    local.add(ToolDef("lang.scaffold", "Scaffold minimal project", level=1),
+              lambda p: _mod(p)[1].scaffold(str(p.get("name", "app")),
+                                            str(p.get("out", "."))))
+    reg.add_module(ModuleDef("langs", "Language expert modules", "0.1.0",
+                             ["lang.detect_all", "lang.lint",
+                              "lang.test", "lang.scaffold"]))
 
 
 def _wire_ui(reg, local) -> None:
@@ -188,15 +216,8 @@ def _wire_pipe(reg, local) -> None:
                    "notes": s.notes} for s in _all]})
     local.add(ToolDef("pipe.run", "Run conveyor headless, returns report",
                       level=2, timeout=1800),
-              lambda p: PipeRunner(
-                  _selected(str(p.get("only", "") or ""),
-                            bool(p.get("heavy", False))),
-                  {"target": p.get("root", "."),
-                   "forge_root": str(_P(__file__).resolve().parents[3])},
-                  checkpoint=str(_P(str(p.get("root", "."))) /
-                                 "forge-pipe-checkpoint.json")).run(
-                  resume=bool(p.get("resume", False)),
-                  serial=bool(p.get("serial", False))).to_dict())
+              lambda p: _mcp_run(p))
+
     local.add(ToolDef("pipe.status", "Checkpoint + history tail", level=0),
               lambda p: _pipe_status(str(p.get("root", "."))))
     local.add(ToolDef("pipe.heal", "Checkpoint + run + repair bundles",
@@ -206,6 +227,30 @@ def _wire_pipe(reg, local) -> None:
     reg.add_module(ModuleDef("pipe", "Conveyor pipeline tools", "0.1.0",
                              ["pipe.stages", "pipe.run", "pipe.status",
                               "pipe.heal"]))
+
+
+def _mcp_run(p: dict) -> dict:
+    from pathlib import Path as _P
+    from ..pipe.runner import PipeRunner
+    from ..pipe.stages import ALL_STAGES, DEFAULT_STAGES, HEAVY_STAGES, git_changed
+    root = str(p.get("root", "."))
+    ctx: dict = {"target": root,
+                 "forge_root": str(_P(__file__).resolve().parents[3])}
+    if p.get("changed"):
+        ch = git_changed(root)
+        if ch is not None:
+            ctx["only"] = ch
+    only = str(p.get("only", "") or "")
+    if only:
+        want = {s.strip() for s in only.split(",") if s.strip()}
+        stages = [s for s in ALL_STAGES.values() if s.name in want]
+    else:
+        stages = list(DEFAULT_STAGES) + (list(HEAVY_STAGES)
+                                          if p.get("heavy") else [])
+    return PipeRunner(stages, ctx, checkpoint=str(
+        _P(root) / "forge-pipe-checkpoint.json")).run(
+        resume=bool(p.get("resume", False)),
+        serial=bool(p.get("serial", False))).to_dict()
 
 
 def _pipe_heal(root: str, serial: bool) -> dict:
