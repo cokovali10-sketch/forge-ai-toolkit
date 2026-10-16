@@ -4,7 +4,7 @@
 
 ### Внешний инструментарий для ИИ-агентов · External toolkit for AI agents
 
-[![tests](https://img.shields.io/badge/tests-99_passing-4ade80?style=for-the-badge)](#)
+[![tests](https://img.shields.io/badge/tests-103_passing-4ade80?style=for-the-badge)](#)
 [![python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](#)
 [![license](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](#)
 [![offline](https://img.shields.io/badge/offline-no_cloud-8b5cf6?style=for-the-badge)](#)
@@ -33,7 +33,7 @@
 { "tool": "pipe.run", "args": { "root": "<project-dir>" } }
 ```
 
-[📦 Релизы](https://github.com/cokovali10-sketch/forge-ai-toolkit/releases) · [🛠 Исходники](./forge/src/forge) · [📜 Changelog](./forge/CHANGELOG.md)
+[📦 Релизы](https://github.com/cokovali10-sketch/forge-ai-toolkit/releases) · [🛠 Исходники](./src/forge) · [📜 Changelog](./CHANGELOG.md)
 
 </div>
 
@@ -51,6 +51,7 @@
 python -m venv .venv
 .venv\Scripts\python -m pip install -e forge
 .venv\Scripts\python -m pytest forge\tests -q
+.venv\Scripts\python -m forge.cli gen web --name shop --out ./shop
 .venv\Scripts\python -m forge.cli pipe window <project-dir>
 ```
 

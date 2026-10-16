@@ -108,6 +108,7 @@ def build_default_registry(anvil_dir: str = "") -> Registry:
     reg.add_module(ModuleDef("project", "Workspace-confined project tools",
                              "0.1.0", [t[0] for t in TOOLS]))
     _wire_lab(reg, local)
+    _wire_gen(reg, local)
     _wire_ui(reg, local)
     _wire_langs(reg, local)
     _wire_edit(reg, local)
@@ -205,6 +206,33 @@ def _wire_evolve(reg, local) -> None:
                                str(_P(__file__).resolve().parents[3])))
     reg.add_module(ModuleDef("evolve", "Self-Update detector", "0.1.0",
                              ["evolve.check"]))
+
+
+def _wire_gen(reg, local) -> None:
+    """Project generators: web landing, python service, go cli, paper plugin."""
+    from ..core.registry import ToolDef
+    from ..gen import go_cli as _g
+    from ..gen import paper_plugin as _pp
+    from ..gen import python_service as _ps
+    from ..gen import web as _w
+    local.add(ToolDef("gen.web", "Scaffold landing page", level=1),
+              lambda p: _w.generate(str(p.get("out", ".")),
+                                    str(p.get("name", "Site"))))
+    local.add(ToolDef("gen.python_service", "Scaffold stdlib microservice",
+                      level=1),
+              lambda p: _ps.generate(str(p.get("out", ".")),
+                                     str(p.get("name", "svc"))))
+    local.add(ToolDef("gen.go_cli", "Scaffold Go CLI tool", level=1),
+              lambda p: _g.generate(str(p.get("out", ".")),
+                                    str(p.get("name", "cli"))))
+    local.add(ToolDef("gen.paper", "Scaffold Paper plugin", level=1),
+              lambda p: _pp.generate(
+                  str(p.get("out", ".")), str(p.get("name", "Demo")),
+                  str(p.get("package", "com.forge.demo")),
+                  str(p.get("command", "hello"))))
+    reg.add_module(ModuleDef("gen", "Project generators", "0.1.0",
+                             ["gen.web", "gen.python_service",
+                              "gen.go_cli", "gen.paper"]))
 
 
 def _wire_ui(reg, local) -> None:

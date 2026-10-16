@@ -84,7 +84,23 @@ def _gen(args: list[str]) -> int:
     sys.path.insert(0, str(ROOT / "src"))
     if not args or args[0] in ("-h", "--help", "help"):
         print("usage: forge gen paper --name X [--package P] [--command C] [--out DIR]")
+        print("       forge gen web|python-service|go-cli --name X --out DIR")
         return 0
+    if args[0] in ("web", "python-service", "go-cli"):
+        import json as _json
+        o = _kv(args[1:])
+        if not o.get("out"):
+            print(f"usage: forge gen {args[0]} --name X --out DIR")
+            return 2
+        from forge.gen import go_cli as _g, python_service as _p, web as _w
+        mod = {"web": _w, "python-service": _p, "go-cli": _g}[args[0]]
+        try:
+            res = mod.generate(o["out"], o.get("name", "demo"))
+        except (ValueError, OSError) as e:
+            print(f"bad options: {e}")
+            return 2
+        print(_json.dumps(res, ensure_ascii=False, indent=2))
+        return 0 if res.get("ok") else 1
     if args[0] != "paper":
         print(f"unknown generator: {args[0]}")
         return 2

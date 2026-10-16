@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- gen: web landing, python-service, go-cli (each self-validated, CLI+MCP),
+  paper stays as the small Minecraft workshop
 - evolve: Self-Update detector (stale skills/rules/history/toolchains),
   `forge evolve` CLI + `evolve.check` MCP
 - edit: universal object editor (JSON engine + YAML via Anvil, lite-schemas,
