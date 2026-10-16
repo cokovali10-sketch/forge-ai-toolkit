@@ -4,10 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "forge-core"
-version = "0.1.0"
-description = "FORGE MVP: module registry, skills, knowledge base, MCP server"
+version = "0.11.0"
+description = "FORGE AI Toolkit: skills, MCP server, project intelligence, pipe conveyor, Testing Lab"
+readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
+keywords = ["ai-agents", "mcp", "code-quality", "minecraft", "testing"]
+
+[project.scripts]
+forge = "forge.cli.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/cokovali10-sketch/forge-ai-toolkit"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

@@ -14,7 +14,11 @@
 - pipe parallel fast stages (`--serial` restores queue), heavy always last
   and only on green fast; fixed as_completed eating timeouts (deadlines)
 - window history tab, run timer, stage titles, SKIPPED icon
-- 74 tests green; pipe passes on its own repo (SUCCESS, 4/4)
+- pipe heal (checkpoint + run + repair bundles + suggested modules)
+- pipe SARIF output, `pipe init-ci` (CI workflow + badge), repo gets real CI
+- stage plugins (`.forge-stages/`), `pipe all` multi-project with `--clean`
+- VS Code extension scaffold, `forge-core` 0.11.0 packаged (sdist+wheel verified)
+- 74+ tests green; pipe passes on its own repo (SUCCESS, 4/4)
 
 ## 0.10.0
 - MCP: minecraft.* (metadata/permissions/compat/logs via Anvil), knowledge.*,

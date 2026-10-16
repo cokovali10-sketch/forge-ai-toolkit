@@ -1,0 +1,17 @@
+{
+  "name": "forge-pipe",
+  "displayName": "FORGE Pipe",
+  "description": "Run the FORGE conveyor (inspect, review, skills, knowledge) from VS Code",
+  "version": "0.1.0",
+  "publisher": "cokovali10-sketch",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onCommand:forge-pipe.run"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "forge-pipe.run", "title": "FORGE: прогнать конвейер" }
+    ]
+  }
+}

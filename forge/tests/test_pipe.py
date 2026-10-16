@@ -1,6 +1,7 @@
 """Tests for the forge pipe conveyor (headless-safe: no window is created)."""
 import json
 import time
+from pathlib import Path
 
 from forge.core.result import ToolResult
 from forge.pipe.runner import PipeRunner, exit_code
@@ -283,3 +284,71 @@ def test_history_rows_and_marks(tmp_path):
         + "\nbad-line\n", encoding="utf-8")
     rows = load_history_rows(str(tmp_path))
     assert len(rows) == 1 and "SUCCESS" in rows[0] and "1/2" in rows[0]
+
+
+def test_heal_success_no_repair(tmp_path):
+    from forge.pipe.heal import heal
+    r = heal(str(tmp_path), str(tmp_path))
+    assert r["report"]["status"] == "SUCCESS"
+    assert r["needed"] is False and r["safety_net"] is True
+
+
+def test_heal_failed_bundles(tmp_path):
+    from forge.pipe.heal import heal
+    (tmp_path / "a.py").write_text("# TODO: later\n", encoding="utf-8")
+    r = heal(str(tmp_path), str(tmp_path))
+    assert r["needed"] is True and r["report"]["status"] == "FAILED"
+    assert r["bundles"] and r["bundles"][0]["stage"] == "review"
+    assert r["bundles"][0]["files"] == ["a.py"]
+    assert Path(r["bundles_file"]).is_file()
+
+
+def test_stage_plugins(tmp_path):
+    from forge.core.result import ToolResult
+    from forge.pipe.plugins import load_plugins
+    d = tmp_path / ".forge-stages"
+    d.mkdir()
+    (d / "good.py").write_text(
+        "from forge.pipe.stages import Stage\n"
+        "from forge.core.result import ToolResult\n"
+        "STAGE = Stage('plug', 'Plug', "
+        "lambda c: ToolResult(status='SUCCESS', result={}))\n",
+        encoding="utf-8")
+    (d / "broken.py").write_text("raise Boom\n", encoding="utf-8")
+    (d / "empty.py").write_text("X = 1\n", encoding="utf-8")
+    (d / "_priv.py").write_text("STAGE = 1\n", encoding="utf-8")
+    stages, skipped = load_plugins(tmp_path)
+    assert [s.name for s in stages] == ["plug"]
+    assert set(skipped) == {"broken.py", "empty.py"}
+
+
+def test_sarif_mapping():
+    from forge.pipe.sarif import report_to_sarif
+    rep = {"stages": [{"name": "review", "data": {"findings": [
+        {"rule": "debt-marker", "level": "confirmed",
+         "file": "a.py", "detail": "L5: # TODO x"},
+        {"rule": "oversized-file", "level": "probable",
+         "file": "b.py", "detail": "900 lines"},
+        {"rule": "debt-marker", "level": "confirmed", "suppressed": True,
+         "file": "c.py", "detail": "L1: x"},
+    ]}}]}
+    s = report_to_sarif(rep, ".")
+    assert s["version"] == "2.1.0"
+    res = s["runs"][0]["results"]
+    assert len(res) == 2  # подавленная не попадает
+    assert res[0]["level"] == "error" and res[0]["locations"][0][
+        "physicalLocation"]["region"]["startLine"] == 5
+    rules = {r["id"] for r in s["runs"][0]["tool"]["driver"]["rules"]}
+    assert rules == {"forge/debt-marker", "forge/oversized-file"}
+
+
+def test_init_ci_and_all(tmp_path):
+    from forge.cli.__main__ import main
+    assert main(["pipe", "init-ci", str(tmp_path)]) == 0
+    wf = tmp_path / ".github" / "workflows" / "forge.yml"
+    assert wf.is_file() and "upload-sarif" in wf.read_text(encoding="utf-8")
+    (tmp_path / "p1").mkdir()
+    (tmp_path / "p2").mkdir()
+    (tmp_path / "p2" / "a.py").write_text("# TODO: x\n", encoding="utf-8")
+    assert main(["pipe", "all", str(tmp_path), "--clean"]) == 1
+    assert not (tmp_path / "p1" / "forge-pipe-checkpoint.json").exists()

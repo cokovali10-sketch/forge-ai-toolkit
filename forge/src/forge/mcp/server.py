@@ -199,8 +199,19 @@ def _wire_pipe(reg, local) -> None:
                   serial=bool(p.get("serial", False))).to_dict())
     local.add(ToolDef("pipe.status", "Checkpoint + history tail", level=0),
               lambda p: _pipe_status(str(p.get("root", "."))))
+    local.add(ToolDef("pipe.heal", "Checkpoint + run + repair bundles",
+                      level=2, timeout=900),
+              lambda p: _pipe_heal(str(p.get("root", ".")),
+                                   bool(p.get("serial", False))))
     reg.add_module(ModuleDef("pipe", "Conveyor pipeline tools", "0.1.0",
-                             ["pipe.stages", "pipe.run", "pipe.status"]))
+                             ["pipe.stages", "pipe.run", "pipe.status",
+                              "pipe.heal"]))
+
+
+def _pipe_heal(root: str, serial: bool) -> dict:
+    from ..pipe.heal import heal as _heal
+    from pathlib import Path as _P
+    return _heal(root, str(_P(__file__).resolve().parents[3]), serial=serial)
 
 
 def _pipe_status(root: str) -> dict:

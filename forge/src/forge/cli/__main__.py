@@ -349,16 +349,37 @@ def _call_any(tool: str, params: dict):
     return AnvilBackend(d).call(tool, params)
 
 
+_CI_WORKFLOW = """name: forge-pipe
+on: [push, pull_request]
+jobs:
+  pipe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -e ./forge
+      - run: python -m pytest forge/tests -q
+      - run: python -m forge.cli pipe run forge --sarif forge.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with: {sarif_file: forge.sarif}
+"""
+
+
 def _pipe(args: list[str]) -> int:
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
-    if not args or args[0] in ("-h", "--help", "help") or args[0] not in ("run", "window", "watch"):
-        print("usage: forge pipe run <dir> [--json] [--resume] [--report PATH] [--only inspect,review] [--heavy] [--serial]")
+    if not args or args[0] in ("-h", "--help", "help") or args[0] not in ("run", "window", "watch", "heal", "init-ci", "all"):
+        print("usage: forge pipe run <dir> [--json] [--resume] [--report PATH] [--only inspect,review] [--heavy] [--serial] [--sarif PATH]")
         print("       run = быстрые параллельно (--serial = строго по очереди)")
         print("       forge pipe window [dir] [--resume]  (окно: только быстрые стадии)")
         print("       forge pipe watch <dir> [--only ...] [--interval S]")
+        print("       forge pipe heal <dir> [--json] [--serial]")
+        print("       forge pipe init-ci [dir]  (workflow + SARIF + бейдж)")
+        print("       forge pipe all <dir> [--json] [--clean]  (все подпроекты разом)")
         print("run = headless для ИИ (окна нет), window = окно для человека,")
-        print("watch = слежка: перезапуск при изменении файлов")
+        print("watch = слежка, heal = страховка + прогон + пакеты ремонта")
         return 0 if args and args[0] in ("-h", "--help", "help") else 2
     from forge.pipe.runner import PipeRunner, exit_code
     from forge.pipe.stages import ALL_STAGES, DEFAULT_STAGES, HEAVY_STAGES
@@ -390,14 +411,82 @@ def _pipe(args: list[str]) -> int:
             raise SystemExit(2)
         return stages
 
+    def _with_plugins(stages: list) -> list:
+        from forge.pipe.plugins import load_plugins
+        if only:
+            return stages  # --only = ровно то, что просили
+        plug, skipped = load_plugins(target)
+        for f, e in skipped.items():
+            print(f"плагин {f} пропущен: {e}")
+        if plug:
+            print(f"плагины стадий: {', '.join(s.name for s in plug)}")
+        return stages + plug
+
+    if mode == "init-ci":
+        wf = Path(target) / ".github" / "workflows" / "forge.yml"
+        wf.parent.mkdir(parents=True, exist_ok=True)
+        wf.write_text(_CI_WORKFLOW, encoding="utf-8")
+        print(f"workflow: {wf}")
+        print("бейдж в README:")
+        print("[![forge-pipe](../../actions/workflows/forge.yml/badge.svg)](../../actions/workflows/forge.yml)")
+        print("(шаблон под раскладку forge-ai-toolkit; под чужой проект адаптируй пути)")
+        return 0
+    if mode == "all":
+        subs = sorted(d for d in Path(target).iterdir()
+                      if d.is_dir() and not d.name.startswith(".")
+                      and d.name not in ("__pycache__", ".venv", "venv",
+                                         "node_modules", "lab-servers",
+                                         "build", "target", "dist"))
+        if not subs:
+            print(f"нет подпроектов в {target}")
+            return 2
+        from forge.pipe.runner import PipeRunner as _PR
+        rows = []
+        worst = 0
+        for sub in subs:
+            r = _PR(list(DEFAULT_STAGES),
+                    {"target": str(sub), "forge_root": str(ROOT)},
+                    checkpoint=str(sub / "forge-pipe-checkpoint.json")).run()
+            rows.append({"project": sub.name, "status": r.status,
+                         "duration_ms": r.duration_ms})
+            worst = max(worst, 0 if r.status == "SUCCESS" else 1)
+            if "--clean" in rest:
+                for art in ("forge-pipe-checkpoint.json", "forge-pipe-report.json",
+                            ".forge-pipe-history.jsonl"):
+                    try:
+                        (sub / art).unlink()
+                    except OSError:
+                        pass
+        if "--json" in rest:
+            print(_json.dumps(rows, ensure_ascii=False))
+        else:
+            for row in rows:
+                mark = "OK " if row["status"] == "SUCCESS" else "FAIL"
+                print(f"  {mark} {row['project']} — {row['duration_ms']}мс")
+            ok = sum(1 for r in rows if r["status"] == "SUCCESS")
+            print(f"итого: {ok}/{len(rows)} зелёных")
+        return worst
     if mode == "window":
         from forge.pipe.window import main as _win
         return _win(target, str(ROOT), resume)
+    if mode == "heal":
+        from forge.pipe.heal import heal as _heal
+        out = _heal(target, str(ROOT), serial="--serial" in rest)
+        if "--json" in rest:
+            print(_json.dumps(out, ensure_ascii=False))
+        else:
+            rep = out["report"]
+            print(f"heal {target}: {rep['status']} "
+                  f"(страховка: {'да' if out['safety_net'] else 'нет'})")
+            if out["needed"]:
+                print(f"нужен ремонт: {len(out['bundles'])} пакетов "
+                      f"-> {out.get('bundles_file', '')}; откат: forge fix rollback {target}")
+        return 0 if out["report"]["status"] == "SUCCESS" else 1
     if mode == "watch":
         from forge.pipe.watch import Watcher
         import time as _t
         try:
-            stages = _select()
+            stages = _with_plugins(_select())
         except SystemExit as e:
             return int(e.code or 2)
 
@@ -422,17 +511,25 @@ def _pipe(args: list[str]) -> int:
     # headless run: окна нет никогда, только stdout + exit code
     as_json = "--json" in rest
     rep_path = None
+    sarif_path = None
     for i, a in enumerate(rest):
         if a == "--report" and i + 1 < len(rest):
             rep_path = rest[i + 1]
+        if a == "--sarif" and i + 1 < len(rest):
+            sarif_path = rest[i + 1]
     try:
-        stages = _select()
+        stages = _with_plugins(_select())
     except SystemExit as e:
         return int(e.code or 2)
     runner = PipeRunner(stages, {"target": target, "forge_root": str(ROOT)},
                         checkpoint=str(Path(target) / "forge-pipe-checkpoint.json"))
     report = runner.run(resume=resume, serial=serial)
     out = report.to_dict()
+    if sarif_path:
+        from forge.pipe.sarif import report_to_sarif
+        Path(sarif_path).write_text(_json.dumps(report_to_sarif(out, target),
+                                                ensure_ascii=False, indent=2),
+                                    encoding="utf-8")
     if rep_path:
         Path(rep_path).write_text(_json.dumps(out, ensure_ascii=False, indent=2),
                                   encoding="utf-8")
