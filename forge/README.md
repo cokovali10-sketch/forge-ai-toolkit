@@ -57,6 +57,20 @@ python -m venv .venv
   плагины стадий (`.forge-stages/`), `pipe all` по всем подпроектам,
   VS Code-расширение (скелет, `editors/vscode`), пакет `forge-core` на PyPI
 
+## Benchmark Arena
+
+Честное табло «кто лучше решает задачи» (промпт §18):
+
+```bat
+.venv\Scripts\python -m forge.cli bench arena <candidate-dir> --agent NAME
+.venv\Scripts\python -m forge.cli bench board
+```
+
+Правила: один замер = одна строка в `benchmarks/scoreboard.jsonl`, в таблице —
+последний прогон каждого агента (не лучший из ста), сырые данные хранятся,
+`SCOREBOARD.md` перегенерируется каждым прогоном. Только явный запуск —
+никакой автоматики.
+
 ## Безопасность конвейера
 
 - Только чтение чужих проектов: обход с лимитами (30 000 файлов), игнор

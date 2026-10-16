@@ -25,6 +25,8 @@
 - 81 tests green; pipe passes on its own repo (SUCCESS, 5/5)
 - hardening: walk limits + onerror, history rotation (200), safe report writes,
   --no-plugins, corrupt-data tolerance, backup failure paths, secrets untouched
+- arena: `bench arena` records runs, `bench board` renders public scoreboard
+  (latest-per-agent, raw jsonl kept); miner is manual-only by policy
 
 ## 0.10.0
 - MCP: minecraft.* (metadata/permissions/compat/logs via Anvil), knowledge.*,

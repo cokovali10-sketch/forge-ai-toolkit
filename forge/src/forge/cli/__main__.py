@@ -178,6 +178,35 @@ def _bench(args: list[str]) -> int:
             t = load_task(f)
             print(f"{t.get('id')}: {t.get('title')} ({len(t.get('checks', []))} checks)")
         return 0
+    if args[0] in ("arena", "board"):
+        from forge.bench import arena as _a
+        board = ROOT / "benchmarks" / "scoreboard.jsonl"
+        if args[0] == "board":
+            print(_a.render(_a.load_board(board)))
+            return 0
+        # arena <candidate> --agent NAME
+        o = _kv(args[1:])
+        cand = ""
+        skip_next = False
+        for a in args[1:]:
+            if skip_next:
+                skip_next = False
+                continue
+            if a.startswith("--"):
+                skip_next = True
+                continue
+            if not cand:
+                cand = a
+        agent = o.get("agent", "manual")
+        if not cand:
+            print("usage: forge bench arena <candidate-dir> --agent NAME")
+            return 2
+        row = _a.record(tasks, cand, agent, board)
+        print(_a.render(_a.load_board(board)))
+        md = ROOT / "benchmarks" / "SCOREBOARD.md"
+        md.write_text(_a.render(_a.load_board(board)), encoding="utf-8")
+        print(f"табло: {board}, витрина: {md}")
+        return 0
     if args[0] == "run" and len(args) > 2:
         agent = "manual"
         rest = list(args[1:])

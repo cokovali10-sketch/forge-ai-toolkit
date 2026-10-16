@@ -437,3 +437,39 @@ def test_safety_hardening(tmp_path):
     names3 = [s["name"] for s in
               _json.loads(rep3.read_text(encoding="utf-8"))["stages"]]
     assert "evil" in names3  # а по умолчанию плагин подхватывается
+
+
+def _mk_tasks(d):
+    d.mkdir(exist_ok=True)
+    import json as _json
+    (d / "t1.json").write_text(_json.dumps({
+        "id": "t1", "title": "T1",
+        "checks": [{"type": "exists", "path": "ok.txt"}]}), encoding="utf-8")
+
+
+def test_arena_records_and_renders(tmp_path):
+    import json as _json
+    from forge.bench import arena as _a
+    tasks = tmp_path / "tasks"
+    _mk_tasks(tasks)
+    cand = tmp_path / "cand"
+    cand.mkdir()
+    (cand / "ok.txt").write_text("x", encoding="utf-8")
+    board = tmp_path / "board.jsonl"
+    r1 = _a.record(tasks, cand, "agent-a", board)
+    assert r1["passed"] == 1
+    r2 = _a.record(tasks, tmp_path / "empty", "agent-b", board)
+    assert r2["passed"] == 0
+    rows = _a.load_board(board)
+    assert len(rows) == 2
+    md = _a.render(rows)
+    assert "agent-a" in md and "1/1" in md and "agent-b" in md
+    # повторный прогон того же агента: в таблице только свежий
+    (cand / "ok.txt").unlink()
+    _a.record(tasks, cand, "agent-a", board)
+    md2 = _a.render(_a.load_board(board))
+    assert md2.count("agent-a") == 1 and "0/1" in md2
+    # битые строки табло не валят чтение
+    with open(board, "a", encoding="utf-8") as f:
+        f.write("garbage{{{\n")
+    assert len(_a.load_board(board)) == 3
