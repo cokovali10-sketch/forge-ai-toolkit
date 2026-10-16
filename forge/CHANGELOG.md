@@ -6,7 +6,9 @@
 - quality.review: `.forge-suppress.json` suppressions (reason required, visible in report)
 - pipe as MCP tools (`pipe.stages`/`pipe.run`/`pipe.status`), `--only` stages,
   run history (`.forge-pipe-history.jsonl`), window «Продолжить» button
-- 65 tests green; pipe passes on its own repo (SUCCESS, 4/4)
+- pipe watch mode: auto re-run on file change (stdlib watcher, own artifacts
+  excluded), CLI `forge pipe watch` + «👁 Следить» toggle in window
+- 67 tests green; pipe passes on its own repo (SUCCESS, 4/4)
 
 ## 0.10.0
 - MCP: minecraft.* (metadata/permissions/compat/logs via Anvil), knowledge.*,

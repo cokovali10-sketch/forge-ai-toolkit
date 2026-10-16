@@ -127,3 +127,33 @@ def test_mcp_pipe_tools(tmp_path):
     assert [s["name"] for s in rep["data"]["stages"]] == ["inspect"]
     st = reg.call("pipe.status", {"root": str(tmp_path)})
     assert isinstance(st["data"]["history"], list) and len(st["data"]["history"]) >= 1
+
+
+def test_watch_snapshot_and_changed(tmp_path):
+    from forge.pipe.watch import changed, snapshot
+    (tmp_path / "a.py").write_text("x=1\n", encoding="utf-8")
+    (tmp_path / "forge-pipe-checkpoint.json").write_text("{}", encoding="utf-8")
+    s1 = snapshot(tmp_path)
+    assert "a.py" in s1 and "forge-pipe-checkpoint.json" not in s1
+    (tmp_path / "a.py").write_text("x=2\n", encoding="utf-8")
+    (tmp_path / "b.py").write_text("y=1\n", encoding="utf-8")
+    s2 = snapshot(tmp_path)
+    assert changed(s1, s2) == ["a.py", "b.py"]
+    assert changed(s2, s2) == []
+
+
+def test_watcher_fires_and_stops(tmp_path):
+    import time as _t
+    from forge.pipe.watch import Watcher
+    hits: list = []
+    w = Watcher(str(tmp_path), hits.append, interval_s=0.1, debounce_s=0.1)
+    w.start()
+    assert w.running
+    _t.sleep(0.3)  # дать вотчеру снять начальный снапшот пустой папки
+    (tmp_path / "a.py").write_text("x=1\n", encoding="utf-8")
+    deadline = _t.time() + 5
+    while not hits and _t.time() < deadline:
+        _t.sleep(0.1)
+    w.stop()
+    assert hits and hits[0] == ["a.py"]
+    assert not w.running

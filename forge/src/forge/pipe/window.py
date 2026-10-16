@@ -99,12 +99,16 @@ class PipeWindow:
         self.btn_stop = ttk.Button(row, text="■ Стоп", command=self.stop,
                                    state="disabled")
         self.btn_stop.pack(side="left", padx=4)
+        self.btn_watch = ttk.Button(row, text="👁 Следить", command=self.toggle_watch)
+        self.btn_watch.pack(side="left", padx=4)
         ttk.Button(row, text="Отчёт", command=self.open_report).pack(side="left", padx=4)
-        ttk.Button(row, text="Закрыть", command=self.root.destroy).pack(side="left", padx=4)
+        ttk.Button(row, text="Закрыть", command=self._close).pack(side="left", padx=4)
+        self.watcher = None
         self.last_report: dict = {}
         self._preload()
         self._refresh_stages()
         self._refresh_cont()
+        self.root.protocol("WM_DELETE_WINDOW", self._close)
         self.root.after(120, self._poll)
 
     def _has_checkpoint(self) -> bool:
@@ -154,6 +158,28 @@ class PipeWindow:
     def stop(self) -> None:
         self.runner.stop()
         self._say("стоп запрошен (остановится между стадиями)")
+
+    def toggle_watch(self) -> None:
+        from forge.pipe.watch import Watcher
+        if self.watcher and self.watcher.running:
+            self.watcher.stop()
+            self.watcher = None
+            self.btn_watch.configure(text="👁 Следить")
+            self._say("слежка выключена")
+            return
+        self.watcher = Watcher(self.target, lambda files: self.events.put(("watch", files)))
+        self.watcher.start()
+        self.btn_watch.configure(text="👁 Не следить")
+        self._say(f"слежу за изменениями в {self.target} — прогон сам перезапустится")
+
+    def _close(self) -> None:
+        try:
+            if self.watcher:
+                self.watcher.stop()
+            self.runner.stop()
+        except Exception:
+            pass
+        self.root.destroy()
 
     def open_report(self) -> None:
         p = Path(self.report_path)
@@ -229,6 +255,11 @@ class PipeWindow:
                     self._say(f"  {icon(status)} {name}: {status}")
                 elif kind == "log":
                     self._say(str(ev[1]))
+                elif kind == "watch":
+                    files = ev[1]
+                    self._say(f"👁 изменено файлов: {len(files)} — автопрогон")
+                    if not (self.thread and self.thread.is_alive()):
+                        self.start()
                 elif kind == "finished":
                     rep = ev[1]
                     self.last_report = rep  # детали доступны сразу, без переоткрытия

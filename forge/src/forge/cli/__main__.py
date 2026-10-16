@@ -352,10 +352,12 @@ def _call_any(tool: str, params: dict):
 def _pipe(args: list[str]) -> int:
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
-    if not args or args[0] in ("-h", "--help", "help") or args[0] not in ("run", "window"):
+    if not args or args[0] in ("-h", "--help", "help") or args[0] not in ("run", "window", "watch"):
         print("usage: forge pipe run <dir> [--json] [--resume] [--report PATH] [--only inspect,review]")
         print("       forge pipe window [dir] [--resume]")
-        print("run = headless для ИИ (окна нет), window = окно для человека")
+        print("       forge pipe watch <dir> [--only ...] [--interval S]")
+        print("run = headless для ИИ (окна нет), window = окно для человека,")
+        print("watch = слежка: перезапуск при изменении файлов")
         return 0 if args and args[0] in ("-h", "--help", "help") else 2
     from forge.pipe.runner import PipeRunner, exit_code
     from forge.pipe.stages import DEFAULT_STAGES
@@ -363,26 +365,67 @@ def _pipe(args: list[str]) -> int:
     rest = args[1:]
     target = next((a for a in rest if not a.startswith("--")), ".")
     resume = "--resume" in rest
-    if mode == "window":
-        from forge.pipe.window import main as _win
-        return _win(target, str(ROOT), resume)
-    # headless run: окна нет никогда, только stdout + exit code
-    as_json = "--json" in rest
-    rep_path = None
     only = ""
+    interval = 2.0
     for i, a in enumerate(rest):
-        if a == "--report" and i + 1 < len(rest):
-            rep_path = rest[i + 1]
         if a == "--only" and i + 1 < len(rest):
             only = rest[i + 1]
-    stages = DEFAULT_STAGES
-    if only:
+        if a == "--interval" and i + 1 < len(rest):
+            try:
+                interval = max(0.5, float(rest[i + 1]))
+            except ValueError:
+                pass
+
+    def _select() -> list:
+        if not only:
+            return DEFAULT_STAGES
         want = {s.strip() for s in only.split(",") if s.strip()}
         stages = [s for s in DEFAULT_STAGES if s.name in want]
         if not stages:
             print(f"unknown stages: {only} (есть: "
                   + ",".join(s.name for s in DEFAULT_STAGES) + ")")
-            return 2
+            raise SystemExit(2)
+        return stages
+
+    if mode == "window":
+        from forge.pipe.window import main as _win
+        return _win(target, str(ROOT), resume)
+    if mode == "watch":
+        from forge.pipe.watch import Watcher
+        import time as _t
+        try:
+            stages = _select()
+        except SystemExit as e:
+            return int(e.code or 2)
+
+        def _once(reason: str = "старт") -> None:
+            runner = PipeRunner(stages, {"target": target, "forge_root": str(ROOT)},
+                                checkpoint=str(Path(target) / "forge-pipe-checkpoint.json"))
+            rep = runner.run(resume=False)
+            print(f"[{reason}] {rep.status} за {rep.duration_ms}мс: "
+                  + ", ".join(f"{s['name']}={s.get('status')}" for s in rep.to_dict()["stages"]))
+
+        _once()
+        print(f"слежу за {target} каждые {interval}с (Ctrl+C — стоп)")
+        watcher = Watcher(target, lambda files: _once(f"изменено: {len(files)} ф."), interval_s=interval)
+        watcher.start()
+        try:
+            while True:
+                _t.sleep(1)
+        except KeyboardInterrupt:
+            watcher.stop()
+            print("слежка остановлена")
+            return 0
+    # headless run: окна нет никогда, только stdout + exit code
+    as_json = "--json" in rest
+    rep_path = None
+    for i, a in enumerate(rest):
+        if a == "--report" and i + 1 < len(rest):
+            rep_path = rest[i + 1]
+    try:
+        stages = _select()
+    except SystemExit as e:
+        return int(e.code or 2)
     runner = PipeRunner(stages, {"target": target, "forge_root": str(ROOT)},
                         checkpoint=str(Path(target) / "forge-pipe-checkpoint.json"))
     report = runner.run(resume=resume)

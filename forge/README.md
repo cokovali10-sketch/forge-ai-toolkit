@@ -45,7 +45,8 @@ python -m venv .venv
   (`forge pipe run`, JSON + exit codes + чекпоинты), окно для человека
   (`forge pipe window`, tkinter, ноль зависимостей). Как MCP-инструменты
   (`pipe.stages`/`pipe.run`/`pipe.status`), выборочные стадии (`--only`),
-  подавитель шума (`.forge-suppress.json`), история прогонов, кнопка «Продолжить»
+  подавитель шума (`.forge-suppress.json`), история прогонов, кнопка «Продолжить»,
+  слежка за файлами (`forge pipe watch`, кнопка «👁 Следить» в окне)
 
 ## Статус / Status
 
