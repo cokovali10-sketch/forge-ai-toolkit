@@ -60,6 +60,15 @@ def tree_hash(root: str | Path, exts: set[str] | None = None) -> str:
 CODE_EXTS = {".py", ".java", ".js", ".ts", ".tsx", ".kt", ".go", ".rs"}
 
 
+def _supp_hash(target: str | Path) -> str:
+    """Хэш файла подавлений: поменялись правила — ревью пересчитывается."""
+    import hashlib as _hl
+    try:
+        return _hl.sha1(Path(target, ".forge-suppress.json").read_bytes()).hexdigest()[:16]
+    except OSError:
+        return "no-suppress"
+
+
 SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__",
              "build", "target", "out", ".gradle", ".idea", "dist"}
 
@@ -161,7 +170,7 @@ DEFAULT_STAGES: list[Stage] = [    Stage("inspect", "1/4 Осмотр проек
           fingerprint=lambda c: tree_hash(c["target"])),
     Stage("review", "2/4 Ревью кода", stage_review, 180.0,
           notes="confirmed = FAIL",
-          fingerprint=lambda c: tree_hash(c["target"], CODE_EXTS)),
+          fingerprint=lambda c: tree_hash(c["target"], CODE_EXTS) + _supp_hash(c["target"])),
     Stage("skills", "3/4 Проверка скиллов", stage_skills, 60.0,
           notes="все скиллы должны валидироваться",
           fingerprint=lambda c: tree_hash(Path(c["forge_root"]) / "skills")),

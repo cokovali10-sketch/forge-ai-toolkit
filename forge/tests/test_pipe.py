@@ -352,3 +352,33 @@ def test_init_ci_and_all(tmp_path):
     (tmp_path / "p2" / "a.py").write_text("# TODO: x\n", encoding="utf-8")
     assert main(["pipe", "all", str(tmp_path), "--clean"]) == 1
     assert not (tmp_path / "p1" / "forge-pipe-checkpoint.json").exists()
+
+
+def test_suppress_invalidates_cache(tmp_path):
+    from forge.pipe.stages import DEFAULT_STAGES
+    rev = next(s for s in DEFAULT_STAGES if s.name == "review")
+    mk = lambda: _mk([rev], tmp_path)
+    (tmp_path / "a.py").write_text("# TODO: later\n", encoding="utf-8")
+    r1 = mk().run()
+    assert r1.status == "FAILED" and not r1.stages[0].get("cached")
+    (tmp_path / ".forge-suppress.json").write_text(
+        "[{\"rule\": \"debt-marker\", \"file\": \"a.py\", "
+        "\"reason\": \"test\"}]", encoding="utf-8")
+    r2 = mk().run()
+    assert r2.status == "SUCCESS" and not r2.stages[0].get("cached")
+
+
+def test_cached_failure_still_fails(tmp_path):
+    calls: list = []
+
+    def _flaky(_ctx):
+        calls.append(1)
+        from forge.core.result import ToolResult
+        return ToolResult(status="FAILED", error={"message": "x"})
+
+    st = Stage("f", "F", _flaky, fingerprint=lambda c: "const")
+    assert _mk([st], tmp_path).run().status == "FAILED"
+    r2 = _mk([st], tmp_path).run()
+    assert calls == [1]  # второй раз из кэша
+    assert r2.stages[0].get("cached") is True
+    assert r2.status == "FAILED"  # но статус честный

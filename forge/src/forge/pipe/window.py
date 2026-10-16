@@ -82,7 +82,8 @@ class PipeWindow:
     def _build(self) -> None:
         self.root = tk.Tk()
         self.root.title(f"FORGE конвейер — {self.target}")
-        self.root.geometry("900x560")
+        self.root.geometry("920x640")
+        self.root.minsize(760, 520)
         # тёмная тема premium developer studio (графит + фиолет/циан)
         bg, fg, acc, acc2 = "#16161e", "#e2e8f0", "#8b5cf6", "#22d3ee"
         self.root.configure(bg=bg)
@@ -96,7 +97,11 @@ class PipeWindow:
         st.configure("TButton", background="#23232e", foreground=fg)
         st.configure("Horizontal.TProgressbar", background=acc2)
         st.configure("TNotebook", background=bg)
-        st.configure("TNotebook.Tab", background="#23232e", foreground=fg)
+        st.configure("TNotebook.Tab", background="#23232e", foreground=fg,
+                     padding=(10, 4))
+        st.map("TNotebook.Tab",
+               background=[("selected", "#8b5cf6")],
+               foreground=[("selected", "white")])
         top = ttk.Frame(self.root, padding=8)
         top.pack(fill="x")
         ttk.Label(top, text=f"Проект: {self.target}").pack(side="left")
@@ -154,6 +159,8 @@ class PipeWindow:
         self._refresh_cont()
         self._refresh_history()
         self.root.protocol("WM_DELETE_WINDOW", self._close)
+        # БЕЗ topmost: окно не ворует фокус (особенно у полноэкранной игры).
+        # Кто запустил — тот и выведет на передний план сам.
         self.root.after(120, self._poll)
 
     def _has_checkpoint(self) -> bool:
@@ -230,6 +237,7 @@ class PipeWindow:
         self._say(f"слежу за изменениями в {self.target} — прогон сам перезапустится")
 
     def _close(self) -> None:
+        _wlog("close requested")
         try:
             if self.watcher:
                 self.watcher.stop()
@@ -343,8 +351,21 @@ def sys_platform() -> str:
     return sys.platform
 
 
+def _wlog(msg: str) -> None:
+    """Журнал жизни окна (диагностика самопроизвольных закрытий)."""
+    try:
+        import datetime as _dt
+        import tempfile as _tf
+        with open(Path(_tf.gettempdir()) / "forge-pipe-window.log",
+                  "a", encoding="utf-8") as f:
+            f.write(f"{_dt.datetime.now():%H:%M:%S} {msg}\n")
+    except Exception:
+        pass
+
+
 def main(target: str, forge_root: str, resume: bool = False) -> int:
     """Entry point: window is created ONLY here."""
+    _wlog(f"open target={target}")
     try:
         w = PipeWindow(target, forge_root, resume)
     except tk.TclError as e:
@@ -352,4 +373,5 @@ def main(target: str, forge_root: str, resume: bool = False) -> int:
         print("используй headless-режим: forge pipe run <dir>")
         return 2
     w.run_ui()
+    _wlog("mainloop exited")
     return 0

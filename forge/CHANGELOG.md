@@ -18,7 +18,11 @@
 - pipe SARIF output, `pipe init-ci` (CI workflow + badge), repo gets real CI
 - stage plugins (`.forge-stages/`), `pipe all` multi-project with `--clean`
 - VS Code extension scaffold, `forge-core` 0.11.0 packаged (sdist+wheel verified)
-- 74+ tests green; pipe passes on its own repo (SUCCESS, 4/4)
+- knowledge base 6 -> 47 entries (java/paper/gradle/testing/python/git/security)
+- window: no focus stealing (topmost removed), bigger geometry, selected-tab style
+- cache correctness: suppress file in review fingerprint, cached FAIL counts
+- live proof: full --heavy run green incl. real 63s Purpur boot
+- 81 tests green; pipe passes on its own repo (SUCCESS, 5/5)
 
 ## 0.10.0
 - MCP: minecraft.* (metadata/permissions/compat/logs via Anvil), knowledge.*,

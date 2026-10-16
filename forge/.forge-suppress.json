@@ -11,6 +11,11 @@
   },
   {
     "rule": "debt-marker",
+    "file": "src/forge/pipe/sarif.py",
+    "reason": "self-reference: rule vocabulary table mapping, not project debt"
+  },
+  {
+    "rule": "debt-marker",
     "file": "tests/test_pipe.py",
     "reason": "test fixture: intentional TODO strings for suppress-logic tests"
   }

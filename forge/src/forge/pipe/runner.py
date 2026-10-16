@@ -238,6 +238,12 @@ class PipeRunner:
                 report.stages.append(pre[st.name])
             elif st.name in results:
                 report.stages.append(results[st.name])
+        if report.status != "CANCELLED":
+            # статус учитывает ВСЕ записи, включая кэш: старый FAIL — это FAIL
+            allowed = {s.name: s.allow_fail for s in self.stages}
+            if any(s.get("status") != "SUCCESS" and not allowed.get(s.get("name"), False)
+                   for s in report.stages):
+                report.status = "FAILED"
         return self._finish(report, t0)
 
     def _finish(self, report: PipeReport, t0: float) -> PipeReport:
