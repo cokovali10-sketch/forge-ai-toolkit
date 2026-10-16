@@ -1,0 +1,17 @@
+[
+  {
+    "rule": "debt-marker",
+    "file": "src/forge/quality/review.py",
+    "reason": "self-reference: the rule docstring and its own regex text, not project debt"
+  },
+  {
+    "rule": "debt-marker",
+    "file": "tests/test_mvp.py",
+    "reason": "test fixture: intentional TODO string required by test_code_review_finds_debt"
+  },
+  {
+    "rule": "debt-marker",
+    "file": "tests/test_pipe.py",
+    "reason": "test fixture: intentional TODO strings for suppress-logic tests"
+  }
+]

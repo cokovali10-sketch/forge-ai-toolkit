@@ -349,6 +349,47 @@ def _call_any(tool: str, params: dict):
     return AnvilBackend(d).call(tool, params)
 
 
+def _pipe(args: list[str]) -> int:
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    if not args or args[0] in ("-h", "--help", "help") or args[0] not in ("run", "window"):
+        print("usage: forge pipe run <dir> [--json] [--resume] [--report PATH]")
+        print("       forge pipe window [dir] [--resume]")
+        print("run = headless для ИИ (окна нет), window = окно для человека")
+        return 0 if args and args[0] in ("-h", "--help", "help") else 2
+    from forge.pipe.runner import PipeRunner, exit_code
+    from forge.pipe.stages import DEFAULT_STAGES
+    mode = args[0]
+    rest = args[1:]
+    target = next((a for a in rest if not a.startswith("--")), ".")
+    resume = "--resume" in rest
+    if mode == "window":
+        from forge.pipe.window import main as _win
+        return _win(target, str(ROOT), resume)
+    # headless run: окна нет никогда, только stdout + exit code
+    as_json = "--json" in rest
+    rep_path = None
+    for i, a in enumerate(rest):
+        if a == "--report" and i + 1 < len(rest):
+            rep_path = rest[i + 1]
+    runner = PipeRunner(DEFAULT_STAGES, {"target": target, "forge_root": str(ROOT)},
+                        checkpoint=str(Path(target) / "forge-pipe-checkpoint.json"))
+    report = runner.run(resume=resume)
+    out = report.to_dict()
+    if rep_path:
+        Path(rep_path).write_text(_json.dumps(out, ensure_ascii=False, indent=2),
+                                  encoding="utf-8")
+    if as_json:
+        print(_json.dumps(out, ensure_ascii=False))
+    else:
+        print(f"конвейер {target}: {report.status} за {report.duration_ms}мс")
+        for s in out["stages"]:
+            mark = "OK " if s.get("status") == "SUCCESS" else "FAIL"
+            extra = " (чекпоинт)" if s.get("resumed") else ""
+            print(f"  {mark} {s.get('title', s['name'])} — {s.get('duration_ms', 0)}мс{extra}")
+    return exit_code(report)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = argv if argv is not None else sys.argv[1:]
     if not args or args[0] in ("-h", "--help", "help"):
@@ -413,6 +454,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if cmd == "lab":
         return _lab(args[1:])
+    if cmd == "pipe":
+        return _pipe(args[1:])
     if cmd == "docs":
         return _docs(args[1:])
     if cmd == "bench":

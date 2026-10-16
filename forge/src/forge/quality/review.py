@@ -16,7 +16,13 @@ SKIP_DIRS = {".git", ".venv", "node_modules", "__pycache__", "build",
 CODE_EXTS = {".java", ".py", ".js", ".ts", ".tsx", ".kt", ".go", ".rs"}
 
 
-def review(root: str | Path, max_files: int = 500) -> dict:
+def review(root: str | Path, max_files: int = 500,
+           suppress: list[dict] | None = None) -> dict:
+    """suppress: [{"rule":..., "file":... (rel path), "reason":...}].
+
+    Подавление БЕЗ причины не действует. Подавленные находки остаются
+    в findings с флагом suppressed (видны, но не считаются confirmed).
+    """
     base = Path(root)
     files: list[Path] = []
     for dirpath, dirnames, filenames in __import__("os").walk(base):
@@ -51,10 +57,24 @@ def review(root: str | Path, max_files: int = 500) -> dict:
                 findings.append({"level": "probable", "rule": "debug-leftover",
                                  "file": rel, "detail": f"L{i}: {s[:80]}"})
     findings.extend(_duplicates(files, base))
-    confirmed = sum(1 for f in findings if f["level"] == "confirmed")
+    suppressed = 0
+    for f in findings:
+        for s in suppress or []:
+            if not s.get("reason"):
+                continue
+            ff = str(f.get("file", "")).replace("\\", "/")
+            sf = str(s.get("file", "")).replace("\\", "/")
+            if f.get("rule") == s.get("rule") and ff == sf:
+                f["suppressed"] = True
+                f["suppress_reason"] = s["reason"]
+                suppressed += 1
+                break
+    confirmed = sum(1 for f in findings
+                    if f["level"] == "confirmed" and not f.get("suppressed"))
     return {"files": len(files), "lines": total_lines,
-            "confirmed": confirmed, "probable": len(findings) - confirmed,
-            "findings": findings[:100]}
+            "confirmed": confirmed,
+            "probable": len(findings) - confirmed - suppressed,
+            "suppressed": suppressed, "findings": findings[:100]}
 
 
 def _duplicates(files: list[Path], base: Path) -> list[dict]:

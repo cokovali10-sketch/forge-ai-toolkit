@@ -27,7 +27,7 @@ python -m venv .venv
 .venv\Scripts\python -m pip install -e forge
 .venv\Scripts\python -m pytest forge\tests -q
 .venv\Scripts\python -m forge.cli modules
-.venv\Scripts\python -m forge.cli lab e2e
+.venv\Scripts\python -m forge.cli pipe run <project-dir>
 ```
 
 ## Возможности / Features
@@ -41,6 +41,9 @@ python -m venv .venv
 - Генератор Paper-плагинов (`forge gen paper ...`)
 - Стандарт ToolResult + уровни разрешений 0–4 (`docs/permissions.md`)
 - Жизненный цикл модулей (enable/disable), генерируемые каталоги (`forge docs`)
+- Конвейер `pipe`: осмотр → ревью → скиллы → знания. Headless для ИИ
+  (`forge pipe run`, JSON + exit codes + чекпоинты), окно для человека
+  (`forge pipe window`, tkinter, ноль зависимостей)
 
 ## Статус / Status
 
