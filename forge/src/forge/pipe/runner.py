@@ -79,9 +79,28 @@ class PipeRunner:
             self.checkpoint.write_text(json.dumps({"done": done}, ensure_ascii=False),
                                        encoding="utf-8")
 
+    def _fingerprint(self, st: Stage) -> str | None:
+        if not st.fingerprint:
+            return None
+        try:
+            return st.fingerprint(self.ctx)
+        except Exception:
+            return None
+
+    def _cached_entry(self, st: Stage, prev: dict) -> dict | None:
+        """Перезапуск только затронутого: входы не изменились — берём из чекпоинта."""
+        if "envelope" not in prev:
+            return None  # старый формат чекпоинта — пересчитать честно
+        fp = self._fingerprint(st)
+        if fp is None or prev.get("fingerprint") != fp:
+            return None
+        entry = {"name": st.name, "title": st.title, "cached": True}
+        entry.update(prev["envelope"])
+        return entry
+
     def run(self, resume: bool = False) -> PipeReport:
         t0 = time.time()
-        done = self._load_done() if resume else {}
+        done = self._load_done()  # нужен всегда: resume + fingerprint-кэш
         report = PipeReport(target=str(self.ctx.get("target", "")),
                             checkpoint=str(self.checkpoint or ""))
         pool = cf.ThreadPoolExecutor(max_workers=1, thread_name_prefix="forge-pipe")
@@ -90,11 +109,18 @@ class PipeRunner:
                 if self._stop:
                     report.status = "CANCELLED"
                     break
+                prev = done.get(st.name, {})
                 if resume and st.name in done:
-                    prev = done[st.name]
+                    base = prev.get("envelope", {"status": prev.get("status"),
+                                                 "duration_ms": prev.get("duration_ms", 0)})
                     report.stages.append({"name": st.name, "title": st.title,
-                                          **prev, "resumed": True})
-                    self._emit("log", f"[{st.name}] пропущено (чекпоинт): {prev.get('status')}")
+                                          **base, "resumed": True})
+                    self._emit("log", f"[{st.name}] пропущено (чекпоинт): {base.get('status')}")
+                    continue
+                hit = self._cached_entry(st, prev) if not resume else None
+                if hit:
+                    report.stages.append(hit)
+                    self._emit("log", f"[{st.name}] кэш: входы не изменились")
                     continue
                 self._emit("stage_start", st.name)
                 t1 = time.time()
@@ -108,8 +134,13 @@ class PipeRunner:
                 entry = {"name": st.name, "title": st.title,
                          **res.envelope()}
                 report.stages.append(entry)
-                done[st.name] = {"status": res.status,
-                                 "duration_ms": res.duration_ms}
+                fp = self._fingerprint(st)
+                saved: dict[str, Any] = {"status": res.status,
+                                         "duration_ms": res.duration_ms,
+                                         "envelope": res.envelope()}
+                if fp is not None:
+                    saved["fingerprint"] = fp
+                done[st.name] = saved
                 self._save_done(done)
                 self._emit("stage_done", st.name, res.status)
                 if res.status != "SUCCESS" and not st.allow_fail:

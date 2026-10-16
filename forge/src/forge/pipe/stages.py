@@ -3,9 +3,15 @@
 Each stage is a small deterministic function (ctx) -> ToolResult.
 Stages use REAL engines only: project walk, quality.review, skills
 loader/validator, knowledge store. No mocks, no hallucinated checks.
+
+Fingerprint (unique tech): every cacheable stage declares WHAT it reads
+as a content hash. The runner skips stages whose inputs did not change —
+plain `run` is incremental like Cargo/Bazel, no flags needed.
 """
 from __future__ import annotations
 
+import hashlib
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -13,6 +19,7 @@ from typing import Any, Callable
 from forge.core.result import ToolResult, timed
 
 StageFn = Callable[[dict[str, Any]], ToolResult]
+PrintFn = Callable[[dict[str, Any]], str | None]
 
 
 @dataclass
@@ -23,6 +30,33 @@ class Stage:
     timeout_s: float = 120.0
     allow_fail: bool = False
     notes: str = ""
+    fingerprint: PrintFn | None = None  # None = всегда запускать
+
+
+def tree_hash(root: str | Path, exts: set[str] | None = None) -> str:
+    """sha1(relpath + size + mtime) по файлам. Дешево, честно, детерминировано."""
+    h = hashlib.sha1()
+    base = Path(root)
+    if not base.is_dir():
+        return "no-dir"
+    for dirpath, dirnames, filenames in os.walk(base):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        for fn in sorted(filenames):
+            if fn in ("forge-pipe-checkpoint.json", "forge-pipe-report.json",
+                      ".forge-pipe-history.jsonl"):
+                continue
+            if exts is not None and Path(fn).suffix.lower() not in exts:
+                continue
+            fp = Path(dirpath) / fn
+            try:
+                st = fp.stat()
+                h.update(f"{fp.relative_to(base)}|{st.st_size}|{st.st_mtime_ns}\n".encode())
+            except OSError:
+                pass
+    return h.hexdigest()[:16]
+
+
+CODE_EXTS = {".py", ".java", ".js", ".ts", ".tsx", ".kt", ".go", ".rs"}
 
 
 SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__",
@@ -123,11 +157,16 @@ def stage_knowledge(ctx: dict[str, Any]) -> ToolResult:
 
 DEFAULT_STAGES: list[Stage] = [
     Stage("inspect", "1/4 Осмотр проекта", stage_inspect, 60.0,
-          notes="структура, языки, сборка"),
+          notes="структура, языки, сборка",
+          fingerprint=lambda c: tree_hash(c["target"])),
     Stage("review", "2/4 Ревью кода", stage_review, 180.0,
-          notes="confirmed = FAIL"),
+          notes="confirmed = FAIL",
+          fingerprint=lambda c: tree_hash(c["target"], CODE_EXTS)),
     Stage("skills", "3/4 Проверка скиллов", stage_skills, 60.0,
-          notes="все скиллы должны валидироваться"),
+          notes="все скиллы должны валидироваться",
+          fingerprint=lambda c: tree_hash(Path(c["forge_root"]) / "skills")),
     Stage("knowledge", "4/4 База знаний", stage_knowledge, 60.0,
-          allow_fail=True, notes="предупреждает, не валит"),
+          allow_fail=True, notes="предупреждает, не валит",
+          fingerprint=lambda c: tree_hash(Path(c["forge_root"]) / "knowledge",
+                                           {".jsonl"})),
 ]

@@ -8,7 +8,9 @@
   run history (`.forge-pipe-history.jsonl`), window «Продолжить» button
 - pipe watch mode: auto re-run on file change (stdlib watcher, own artifacts
   excluded), CLI `forge pipe watch` + «👁 Следить» toggle in window
-- 67 tests green; pipe passes on its own repo (SUCCESS, 4/4)
+- pipe fingerprints: content-hash per stage, repeat runs use checkpoint cache
+  (only affected stages re-run), `(кэш)` marks in output
+- 68 tests green; pipe passes on its own repo (SUCCESS, 4/4)
 
 ## 0.10.0
 - MCP: minecraft.* (metadata/permissions/compat/logs via Anvil), knowledge.*,

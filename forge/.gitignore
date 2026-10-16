@@ -6,3 +6,6 @@ __pycache__/
 
 lab-runs/
 *.jar
+forge-pipe-checkpoint.json
+forge-pipe-report.json
+.forge-pipe-history.jsonl

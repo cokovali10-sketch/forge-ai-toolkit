@@ -157,3 +157,55 @@ def test_watcher_fires_and_stops(tmp_path):
     w.stop()
     assert hits and hits[0] == ["a.py"]
     assert not w.running
+
+
+def test_tree_hash_stable_and_sensitive(tmp_path):
+    from forge.pipe.stages import tree_hash
+    (tmp_path / "a.py").write_text("x=1\n", encoding="utf-8")
+    h1 = tree_hash(tmp_path)
+    assert tree_hash(tmp_path) == h1
+    (tmp_path / "a.py").write_text("x=2\n", encoding="utf-8")
+    assert tree_hash(tmp_path) != h1
+    # артефакты конвейера на хэш не влияют
+    (tmp_path / "forge-pipe-checkpoint.json").write_text("{}", encoding="utf-8")
+    h2 = tree_hash(tmp_path)
+    (tmp_path / "forge-pipe-checkpoint.json").write_text("{\"x\": 1}", encoding="utf-8")
+    assert tree_hash(tmp_path) == h2
+
+
+def test_incremental_skips_unchanged(tmp_path):
+    from forge.pipe.stages import tree_hash
+    calls: list = []
+
+    def _counted(_ctx):
+        calls.append(1)
+        return ToolResult(status="SUCCESS", result={})
+
+    fp = lambda c: tree_hash(c["target"], {".py"})  # noqa: E731
+    mk = lambda: _mk([Stage("a", "A", _counted, fingerprint=fp)], tmp_path)
+    (tmp_path / "a.py").write_text("x=1\n", encoding="utf-8")
+    r1 = mk().run()
+    assert r1.status == "SUCCESS" and calls == [1]
+    r2 = mk().run()  # без resume, но входы те же
+    assert calls == [1]
+    assert r2.stages[0].get("cached") is True
+    (tmp_path / "a.py").write_text("x=2\n", encoding="utf-8")
+    r3 = mk().run()
+    assert calls == [1, 1] and not r3.stages[0].get("cached")
+
+
+def test_incremental_ext_filter(tmp_path):
+    from forge.pipe.stages import tree_hash
+    calls: list = []
+
+    def _counted(_ctx):
+        calls.append(1)
+        return ToolResult(status="SUCCESS", result={})
+
+    fp = lambda c: tree_hash(c["target"], {".py"})  # noqa: E731
+    mk = lambda: _mk([Stage("a", "A", _counted, fingerprint=fp)], tmp_path)
+    (tmp_path / "a.py").write_text("x=1\n", encoding="utf-8")
+    mk().run()
+    (tmp_path / "pic.png").write_bytes(b"\x89PNG")
+    r = mk().run()  # .png вне фильтра — кэш жив
+    assert calls == [1] and r.stages[0].get("cached") is True

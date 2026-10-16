@@ -440,6 +440,7 @@ def _pipe(args: list[str]) -> int:
         for s in out["stages"]:
             mark = "OK " if s.get("status") == "SUCCESS" else "FAIL"
             extra = " (чекпоинт)" if s.get("resumed") else ""
+            extra = " (кэш)" if s.get("cached") else extra
             print(f"  {mark} {s.get('title', s['name'])} — {s.get('duration_ms', 0)}мс{extra}")
     return exit_code(report)
 
