@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- evolve: Self-Update detector (stale skills/rules/history/toolchains),
+  `forge evolve` CLI + `evolve.check` MCP
 - edit: universal object editor (JSON engine + YAML via Anvil, lite-schemas,
   dry-run, .forge-bak, rollback), CLI + `edit.*` MCP tools
 - langs: python/javascript/rust/cpp/go modules (detect/lint/test/scaffold),

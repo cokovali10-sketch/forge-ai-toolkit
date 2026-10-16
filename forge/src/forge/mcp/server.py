@@ -111,6 +111,7 @@ def build_default_registry(anvil_dir: str = "") -> Registry:
     _wire_ui(reg, local)
     _wire_langs(reg, local)
     _wire_edit(reg, local)
+    _wire_evolve(reg, local)
     _wire_pipe(reg, local)
     _wire_more(reg, local, anvil_dir)
     if anvil_dir and Path(anvil_dir, "anvil_call.py").is_file():
@@ -192,6 +193,18 @@ def _wire_edit(reg, local) -> None:
     reg.add_module(ModuleDef("edit", "Universal object editor", "0.1.0",
                              ["edit.inspect", "edit.get", "edit.set",
                               "edit.validate", "edit.rollback"]))
+
+
+def _wire_evolve(reg, local) -> None:
+    """Self-Update detector: staleness tasks for agents."""
+    from pathlib import Path as _P
+    from ..core.registry import ToolDef
+    from ..evolve.check import check as _check
+    local.add(ToolDef("evolve.check", "Find stale skills/rules/history", level=0),
+              lambda p: _check(str(p.get("root", ".")),
+                               str(_P(__file__).resolve().parents[3])))
+    reg.add_module(ModuleDef("evolve", "Self-Update detector", "0.1.0",
+                             ["evolve.check"]))
 
 
 def _wire_ui(reg, local) -> None:

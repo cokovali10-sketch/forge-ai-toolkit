@@ -500,6 +500,25 @@ def _flag(args: list[str], name: str) -> str:
     return ""
 
 
+def _evolve(args: list[str]) -> int:
+    """forge evolve [dir] [--json]: что протухло и кому чинить."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.evolve.check import check as _check
+    target = next((a for a in args if not a.startswith("--")), ".")
+    out = _check(target, str(ROOT))
+    if "--json" in args:
+        print(_json.dumps(out, ensure_ascii=False))
+    else:
+        print(f"evolve {target}: задач: {out['total']}")
+        for t in out["tasks"]:
+            print(f"  [{t['priority']}] {t['area']}: {t['evidence'][:120]} "
+                  f"-> {','.join(t['suggest'])}")
+        if not out["tasks"]:
+            print("  всё свежо, задач нет")
+    return 0
+
+
 def _pipe(args: list[str]) -> int:
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
@@ -776,6 +795,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if cmd == "lab":
         return _lab(args[1:])
+    if cmd == "evolve":
+        return _evolve(args[1:])
     if cmd == "edit":
         return _edit(args[1:])
     if cmd == "lang":

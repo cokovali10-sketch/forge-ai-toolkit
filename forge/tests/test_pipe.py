@@ -549,3 +549,33 @@ def test_hub_collect_and_serve(tmp_path):
     finally:
         srv.shutdown()
         th.join(timeout=5)
+
+
+def test_evolve_detects_staleness(tmp_path):
+    import json as _json
+    from forge.evolve.check import check
+    from forge.cli.__main__ import main
+    # пустая папка, настоящий forge_root: скиллы ок, истории нет
+    r = check(str(tmp_path), "D:/Forge-Factority/forge")
+    assert isinstance(r["tasks"], list)
+    assert all(set(t) == {"area", "priority", "evidence", "suggest"}
+               for t in r["tasks"])
+    # правило с 3 подавлениями -> задача на калибровку
+    (tmp_path / ".forge-suppress.json").write_text(_json.dumps(
+        [{"rule": "debt-marker", "file": f"f{i}.py", "reason": "t"}
+         for i in range(3)]), encoding="utf-8")
+    r2 = check(str(tmp_path), "D:/Forge-Factority/forge")
+    assert any(t["area"] == "rules" and "debt-marker" in t["evidence"]
+               for t in r2["tasks"])
+    # история с 3 падениями стадии -> задача
+    (tmp_path / ".forge-pipe-history.jsonl").write_text("\n".join(
+        [_json.dumps({"ts": 1, "status": "FAILED", "duration_ms": 1,
+                      "stages": [{"name": "review", "status": "FAILED"}]})
+         for _ in range(3)]), encoding="utf-8")
+    r3 = check(str(tmp_path), "D:/Forge-Factority/forge")
+    assert any(t["area"] == "history" and "review" in t["evidence"]
+               for t in r3["tasks"])
+    assert main(["evolve", str(tmp_path)]) == 0
+    from forge.mcp.server import build_default_registry
+    reg = build_default_registry("")
+    assert "evolve.check" in reg.tool_owner
