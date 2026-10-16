@@ -110,6 +110,7 @@ def build_default_registry(anvil_dir: str = "") -> Registry:
     _wire_lab(reg, local)
     _wire_ui(reg, local)
     _wire_langs(reg, local)
+    _wire_edit(reg, local)
     _wire_pipe(reg, local)
     _wire_more(reg, local, anvil_dir)
     if anvil_dir and Path(anvil_dir, "anvil_call.py").is_file():
@@ -163,6 +164,34 @@ def _wire_langs(reg, local) -> None:
     reg.add_module(ModuleDef("langs", "Language expert modules", "0.1.0",
                              ["lang.detect_all", "lang.lint",
                               "lang.test", "lang.scaffold"]))
+
+
+def _wire_edit(reg, local) -> None:
+    """Universal object editor: JSON natively, YAML via Anvil bridge."""
+    from ..core.registry import ToolDef
+    from ..edit import api as _api
+
+    local.add(ToolDef("edit.inspect", "Show document structure", level=0),
+              lambda p: _api.inspect(str(p.get("file", ""))))
+    local.add(ToolDef("edit.get", "Get value by dotted path", level=0),
+              lambda p: _api.get(str(p.get("file", "")),
+                                 str(p.get("path", ""))))
+    local.add(ToolDef("edit.set", "Set value (backup + optional schema)",
+                      level=2),
+              lambda p: _api.set(str(p.get("file", "")),
+                                 str(p.get("path", "")),
+                                 str(p.get("value", "null")),
+                                 bool(p.get("dry", False)),
+                                 str(p.get("schema", ""))))
+    local.add(ToolDef("edit.validate", "Validate against lite-schema",
+                      level=0),
+              lambda p: _api.validate(str(p.get("file", "")),
+                                       str(p.get("schema", ""))))
+    local.add(ToolDef("edit.rollback", "Restore .forge-bak", level=2),
+              lambda p: _api.rollback(str(p.get("file", ""))))
+    reg.add_module(ModuleDef("edit", "Universal object editor", "0.1.0",
+                             ["edit.inspect", "edit.get", "edit.set",
+                              "edit.validate", "edit.rollback"]))
 
 
 def _wire_ui(reg, local) -> None:

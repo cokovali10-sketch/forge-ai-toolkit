@@ -98,6 +98,20 @@ cargo test, ctest, go test) / `scaffold` (минимальный проект).
 Правила честные (подсмотрены у Trunk): тулчейна нет = WARNING, а не FAIL;
 стадия конвейера `5/6 Языки проекта`; MCP-инструменты `lang.*`.
 
+## Редактор объектов
+
+```bat
+.venv\Scripts\python -m forge.cli edit inspect config.json
+.venv\Scripts\python -m forge.cli edit get plugin.yml name
+.venv\Scripts\python -m forge.cli edit set config.json server.port 9090 --dry
+.venv\Scripts\python -m forge.cli edit validate cfg.json --schema plugin-yml
+.venv\Scripts\python -m forge.cli edit rollback config.json
+```
+
+JSON — свой движок (точечные пути со списками, lite-схемы, `.forge-bak`,
+rollback), YAML — через мост Anvil без дублирования парсера.
+MCP: `edit.inspect/get/set/validate/rollback` (запись — level 2).
+
 ## Безопасность конвейера
 
 - Только чтение чужих проектов: обход с лимитами (30 000 файлов), игнор

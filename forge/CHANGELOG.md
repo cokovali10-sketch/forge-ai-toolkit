@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- edit: universal object editor (JSON engine + YAML via Anvil, lite-schemas,
+  dry-run, .forge-bak, rollback), CLI + `edit.*` MCP tools
 - langs: python/javascript/rust/cpp/go modules (detect/lint/test/scaffold),
   `forge lang` CLI, `5/6` pipe stage, `lang.*` MCP tools
 - review: 4MB cap, `# forge-ignore` line suppressions, `--changed` hold-the-line

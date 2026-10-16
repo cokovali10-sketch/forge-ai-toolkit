@@ -1,0 +1,14 @@
+{
+  "$schema-note": "forge lite-schema: type/required/enum/min/max + вложенность",
+  "type": "object",
+  "required": ["name", "version", "main"],
+  "properties": {
+    "name": { "type": "string" },
+    "version": { "type": "string" },
+    "main": { "type": "string" },
+    "api-version": { "type": "string" },
+    "description": { "type": "string" },
+    "author": { "type": "string" },
+    "commands": { "type": "object" }
+  }
+}

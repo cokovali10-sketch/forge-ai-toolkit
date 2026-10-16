@@ -458,6 +458,48 @@ def _lang(args: list[str]) -> int:
     return 2
 
 
+def _edit(args: list[str]) -> int:
+    """forge edit inspect|get|set|validate|rollback — JSON свой, YAML через Anvil."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.edit import api as _api
+    if not args or args[0] in ("-h", "--help", "help"):
+        print("usage: forge edit inspect <file>")
+        print("       forge edit get <file> <dotted.path>")
+        print("       forge edit set <file> <dotted.path> <value-json> [--dry] [--schema NAME|PATH]")
+        print("       forge edit validate <file> --schema NAME|PATH")
+        print("       forge edit rollback <file>")
+        return 0
+    cmd, rest = args[0], args[1:]
+    try:
+        if cmd == "inspect" and len(rest) >= 1:
+            out = _api.inspect(rest[0])
+        elif cmd == "get" and len(rest) >= 2:
+            out = _api.get(rest[0], rest[1])
+        elif cmd == "set" and len(rest) >= 3:
+            out = _api.set(rest[0], rest[1], rest[2], "--dry" in rest,
+                           _flag(rest, "--schema"))
+        elif cmd == "validate" and len(rest) >= 1:
+            out = _api.validate(rest[0], _flag(rest, "--schema"))
+        elif cmd == "rollback" and len(rest) >= 1:
+            out = _api.rollback(rest[0])
+        else:
+            print(f"usage: forge edit ... (неверные аргументы: {cmd})")
+            return 2
+    except Exception as e:  # noqa: BLE001 - CLI не падает с трейсом
+        print(f"ошибка: {type(e).__name__}: {e}")
+        return 1
+    print(_json.dumps(out, ensure_ascii=False, indent=2))
+    return 0 if out.get("ok", True) and "error" not in out else 1
+
+
+def _flag(args: list[str], name: str) -> str:
+    for i, a in enumerate(args):
+        if a == name and i + 1 < len(args):
+            return args[i + 1]
+    return ""
+
+
 def _pipe(args: list[str]) -> int:
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
@@ -734,6 +776,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if cmd == "lab":
         return _lab(args[1:])
+    if cmd == "edit":
+        return _edit(args[1:])
     if cmd == "lang":
         return _lang(args[1:])
     if cmd == "pipe":
