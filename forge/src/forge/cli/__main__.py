@@ -353,7 +353,8 @@ def _pipe(args: list[str]) -> int:
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
     if not args or args[0] in ("-h", "--help", "help") or args[0] not in ("run", "window", "watch"):
-        print("usage: forge pipe run <dir> [--json] [--resume] [--report PATH] [--only inspect,review] [--heavy]")
+        print("usage: forge pipe run <dir> [--json] [--resume] [--report PATH] [--only inspect,review] [--heavy] [--serial]")
+        print("       run = быстрые параллельно (--serial = строго по очереди)")
         print("       forge pipe window [dir] [--resume]  (окно: только быстрые стадии)")
         print("       forge pipe watch <dir> [--only ...] [--interval S]")
         print("run = headless для ИИ (окна нет), window = окно для человека,")
@@ -366,6 +367,7 @@ def _pipe(args: list[str]) -> int:
     target = next((a for a in rest if not a.startswith("--")), ".")
     resume = "--resume" in rest
     heavy = "--heavy" in rest
+    serial = "--serial" in rest
     only = ""
     interval = 2.0
     for i, a in enumerate(rest):
@@ -429,7 +431,7 @@ def _pipe(args: list[str]) -> int:
         return int(e.code or 2)
     runner = PipeRunner(stages, {"target": target, "forge_root": str(ROOT)},
                         checkpoint=str(Path(target) / "forge-pipe-checkpoint.json"))
-    report = runner.run(resume=resume)
+    report = runner.run(resume=resume, serial=serial)
     out = report.to_dict()
     if rep_path:
         Path(rep_path).write_text(_json.dumps(out, ensure_ascii=False, indent=2),

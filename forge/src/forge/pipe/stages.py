@@ -31,6 +31,7 @@ class Stage:
     allow_fail: bool = False
     notes: str = ""
     fingerprint: PrintFn | None = None  # None = всегда запускать
+    heavy: bool = False  # тяжёлые идут строго после быстрых и только на зелёном
 
 
 def tree_hash(root: str | Path, exts: set[str] | None = None) -> str:
@@ -211,7 +212,8 @@ HEAVY_STAGES: list[Stage] = [
               Path(c["forge_root"]) / "tests" / "fixture-plugin",
               CODE_EXTS) + tree_hash(
               Path(c["forge_root"]) / "src" / "forge" / "lab",
-              {".py"})),
+              {".py"}),
+          heavy=True),
 ]
 
 ALL_STAGES: dict[str, Stage] = {s.name: s for s in DEFAULT_STAGES + HEAVY_STAGES}

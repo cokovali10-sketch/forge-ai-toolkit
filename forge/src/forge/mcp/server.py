@@ -195,7 +195,8 @@ def _wire_pipe(reg, local) -> None:
                    "forge_root": str(_P(__file__).resolve().parents[3])},
                   checkpoint=str(_P(str(p.get("root", "."))) /
                                  "forge-pipe-checkpoint.json")).run(
-                  resume=bool(p.get("resume", False))).to_dict())
+                  resume=bool(p.get("resume", False)),
+                  serial=bool(p.get("serial", False))).to_dict())
     local.add(ToolDef("pipe.status", "Checkpoint + history tail", level=0),
               lambda p: _pipe_status(str(p.get("root", "."))))
     reg.add_module(ModuleDef("pipe", "Conveyor pipeline tools", "0.1.0",

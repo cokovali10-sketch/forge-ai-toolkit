@@ -1,7 +1,9 @@
 """FORGE pipe runner: the conveyor itself.
 
-Runs stages sequentially, each with its own timeout (thread pool, 1 worker).
-After every stage a checkpoint is written, so `--resume` skips finished stages.
+Fast stages run IN PARALLEL (all read-only); heavy ones strictly after,
+and only if fast are green. Each stage keeps its own timeout.
+After every stage a checkpoint is written, so `--resume` skips finished
+stages and fingerprints skip unchanged ones.
 Headless by design: progress goes to an `on_event` callback, never to a window.
 
 Events: ("stage_start", name) | ("log", text) | ("stage_done", name, status)
@@ -98,57 +100,147 @@ class PipeRunner:
         entry.update(prev["envelope"])
         return entry
 
-    def run(self, resume: bool = False) -> PipeReport:
-        t0 = time.time()
-        done = self._load_done()  # нужен всегда: resume + fingerprint-кэш
-        report = PipeReport(target=str(self.ctx.get("target", "")),
-                            checkpoint=str(self.checkpoint or ""))
-        pool = cf.ThreadPoolExecutor(max_workers=1, thread_name_prefix="forge-pipe")
-        try:
-            for st in self.stages:
-                if self._stop:
-                    report.status = "CANCELLED"
-                    break
-                prev = done.get(st.name, {})
-                if resume and st.name in done:
-                    base = prev.get("envelope", {"status": prev.get("status"),
-                                                 "duration_ms": prev.get("duration_ms", 0)})
-                    report.stages.append({"name": st.name, "title": st.title,
-                                          **base, "resumed": True})
-                    self._emit("log", f"[{st.name}] пропущено (чекпоинт): {base.get('status')}")
-                    continue
-                hit = self._cached_entry(st, prev) if not resume else None
-                if hit:
-                    report.stages.append(hit)
-                    self._emit("log", f"[{st.name}] кэш: входы не изменились")
-                    continue
-                self._emit("stage_start", st.name)
-                t1 = time.time()
+    def _store(self, st: Stage, res: ToolResult,
+               done: dict[str, dict]) -> dict[str, Any]:
+        entry = {"name": st.name, "title": st.title, **res.envelope()}
+        fp = self._fingerprint(st)
+        saved: dict[str, Any] = {"status": res.status,
+                                 "duration_ms": res.duration_ms,
+                                 "envelope": res.envelope()}
+        if fp is not None:
+            saved["fingerprint"] = fp
+        done[st.name] = saved
+        self._save_done(done)
+        self._emit("stage_done", st.name, res.status)
+        return entry
+
+    def _timed_out(self, st: Stage, t1: float) -> ToolResult:
+        return ToolResult(status=TIMEOUT, error={
+            "message": f"превышен лимит {st.timeout_s}с"},
+            duration_ms=int((time.time() - t1) * 1000))
+
+    def _run_sequential(self, todo: list[Stage], done: dict[str, dict],
+                        results: dict[str, dict]) -> bool:
+        """Строго по очереди, стоп на первой несогласованной. Возвращает failed."""
+        failed = False
+        for st in todo:
+            if self._stop:
+                return True
+            self._emit("stage_start", st.name)
+            t1 = time.time()
+            with cf.ThreadPoolExecutor(max_workers=1,
+                                       thread_name_prefix="forge-pipe") as pool:
                 fut = pool.submit(_run_one, lambda s=st: s.fn(self.ctx))
                 try:
                     res = fut.result(timeout=st.timeout_s)
                 except cf.TimeoutError:
-                    res = ToolResult(status=TIMEOUT, error={
-                        "message": f"превышен лимит {st.timeout_s}с"},
-                        duration_ms=int((time.time() - t1) * 1000))
-                entry = {"name": st.name, "title": st.title,
-                         **res.envelope()}
-                report.stages.append(entry)
-                fp = self._fingerprint(st)
-                saved: dict[str, Any] = {"status": res.status,
-                                         "duration_ms": res.duration_ms,
-                                         "envelope": res.envelope()}
-                if fp is not None:
-                    saved["fingerprint"] = fp
-                done[st.name] = saved
-                self._save_done(done)
-                self._emit("stage_done", st.name, res.status)
-                if res.status != "SUCCESS" and not st.allow_fail:
-                    report.status = "FAILED"
-                    self._emit("log", f"[{st.name}] СТОП: {res.status}")
-                    break
+                    res = self._timed_out(st, t1)
+            results[st.name] = self._store(st, res, done)
+            if res.status != "SUCCESS" and not st.allow_fail:
+                self._emit("log", f"[{st.name}] СТОП: {res.status}")
+                return True
+        return failed
+
+    def _run_batch(self, todo: list[Stage], done: dict[str, dict],
+                   results: dict[str, dict]) -> bool:
+        """Параллельно: все быстрые стадии сразу, итог — по худшему.
+
+        Таймаут каждой стадии считается от её старта (дедлайн), а не от
+        момента опроса — иначе as_completed съедал бы таймауты.
+        """
+        futs: dict[Any, tuple[Stage, float]] = {}
+        pool = cf.ThreadPoolExecutor(max_workers=max(1, len(todo)),
+                                     thread_name_prefix="forge-pipe")
+        try:
+            for st in todo:
+                self._emit("stage_start", st.name)
+                futs[pool.submit(_run_one, lambda s=st: s.fn(self.ctx))] = (st, time.time())
+            for fut, (st, t1) in futs.items():
+                if self._stop:
+                    for f in futs:
+                        f.cancel()
+                    results[st.name] = {"name": st.name, "title": st.title,
+                                        "ok": False, "status": "CANCELLED",
+                                        "duration_ms": 0}
+                    return True
+                try:
+                    res = fut.result(timeout=max(0.0, t1 + st.timeout_s - time.time()))
+                except cf.TimeoutError:
+                    res = self._timed_out(st, t1)
+                results[st.name] = self._store(st, res, done)
         finally:
             pool.shutdown(wait=False, cancel_futures=True)
+        return False
+
+    def run(self, resume: bool = False, serial: bool = False) -> PipeReport:
+        t0 = time.time()
+        done = self._load_done()  # нужен всегда: resume + fingerprint-кэш
+        report = PipeReport(target=str(self.ctx.get("target", "")),
+                            checkpoint=str(self.checkpoint or ""))
+        # Фаза 1: resume/кэш — дёшево и последовательно
+        pre: dict[str, dict] = {}
+        pending: list[Stage] = []
+        for st in self.stages:
+            if self._stop:
+                report.status = "CANCELLED"
+                return self._finish(report, t0)
+            prev = done.get(st.name, {})
+            if resume and st.name in done:
+                base = prev.get("envelope", {"status": prev.get("status"),
+                                             "duration_ms": prev.get("duration_ms", 0)})
+                pre[st.name] = {"name": st.name, "title": st.title,
+                                **base, "resumed": True}
+                self._emit("log", f"[{st.name}] пропущено (чекпоинт): {base.get('status')}")
+                continue
+            hit = self._cached_entry(st, prev) if not resume else None
+            if hit:
+                pre[st.name] = hit
+                self._emit("log", f"[{st.name}] кэш: входы не изменились")
+                continue
+            pending.append(st)
+        # Фаза 2: быстрые — пачкой (или очередью при --serial), тяжёлые — строго после
+        results: dict[str, dict] = {}
+        fast = [s for s in pending if not s.heavy]
+        heavy = [s for s in pending if s.heavy]
+        failed = False
+        if fast:
+            if serial:
+                failed = self._run_sequential(fast, done, results)
+            else:
+                failed = self._run_batch(fast, done, results)
+                failed = failed or any(
+                    results[s.name].get("status") != "SUCCESS" and not s.allow_fail
+                    for s in fast if s.name in results)
+        if self._stop:
+            report.status = "CANCELLED"
+        elif heavy and failed:
+            for st in heavy:  # дорогие не гоняем на красном фундаменте
+                results[st.name] = {"name": st.name, "title": st.title,
+                                    "ok": False, "status": "SKIPPED",
+                                    "duration_ms": 0,
+                                    "skipped_reason": "fast stages failed"}
+                self._emit("log", f"[{st.name}] пропущена: быстрые упали")
+            report.status = "FAILED"
+        elif heavy:
+            if self._stop:
+                report.status = "CANCELLED"
+            elif self._run_sequential(heavy, done, results):
+                report.status = "FAILED"
+        if report.status != "CANCELLED":
+            bad = [s for s in pending
+                   if s.name in results
+                   and results[s.name].get("status") != "SUCCESS"
+                   and not s.allow_fail]
+            if bad:
+                report.status = "FAILED"
+        for st in self.stages:  # порядок отчёта = порядок объявления
+            if st.name in pre:
+                report.stages.append(pre[st.name])
+            elif st.name in results:
+                report.stages.append(results[st.name])
+        return self._finish(report, t0)
+
+    def _finish(self, report: PipeReport, t0: float) -> PipeReport:
         report.duration_ms = int((time.time() - t0) * 1000)
         self._append_history(report)
         self._emit("finished", report.to_dict())

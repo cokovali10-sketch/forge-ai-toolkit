@@ -11,7 +11,10 @@
 - pipe fingerprints: content-hash per stage, repeat runs use checkpoint cache
   (only affected stages re-run), `(кэш)` marks in output
 - pipe heavy stage `lab-e2e` (real Purpur boot, env-gated, `--heavy` only)
-- 71 tests green; pipe passes on its own repo (SUCCESS, 4/4)
+- pipe parallel fast stages (`--serial` restores queue), heavy always last
+  and only on green fast; fixed as_completed eating timeouts (deadlines)
+- window history tab, run timer, stage titles, SKIPPED icon
+- 74 tests green; pipe passes on its own repo (SUCCESS, 4/4)
 
 ## 0.10.0
 - MCP: minecraft.* (metadata/permissions/compat/logs via Anvil), knowledge.*,

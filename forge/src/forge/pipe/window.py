@@ -12,13 +12,14 @@ import json
 import os
 import queue
 import threading
+import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import scrolledtext, ttk
 
 ICON = {"PENDING": "\u25cb", "RUN": "\u25b6", "SUCCESS": "\u2713",
         "FAILED": "\u2717", "ERROR": "\u26a0", "TIMEOUT": "\u23f1",
-        "CANCELLED": "\u25a0", "SKIP": "\u21a9"}
+        "CANCELLED": "\u25a0", "SKIP": "\u21a9", "SKIPPED": "\u23ed"}
 
 
 def icon(status: str) -> str:
@@ -30,7 +31,31 @@ def fmt_entry(entry: dict) -> str:
     """Pure helper: one-line stage summary for the list."""
     ms = entry.get("duration_ms", 0)
     extra = " (чекпоинт)" if entry.get("resumed") else ""
+    extra = " (кэш)" if entry.get("cached") else extra
     return f"{icon(entry.get('status', '?'))} {entry.get('title', entry.get('name', '?'))} — {ms}мс{extra}"
+
+
+def load_history_rows(target: str, limit: int = 50) -> list[str]:
+    """Pure helper: строки истории прогонов (без окна, тестируется)."""
+    import datetime as _dt
+    p = Path(target) / ".forge-pipe-history.jsonl"
+    if not p.is_file():
+        return []
+    rows = []
+    try:
+        lines = p.read_text(encoding="utf-8").splitlines()[-limit:]
+    except OSError:
+        return []
+    for line in lines:
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        ts = _dt.datetime.fromtimestamp(r.get("ts", 0)).strftime("%m-%d %H:%M")
+        ok = sum(1 for s in r.get("stages", []) if s.get("status") == "SUCCESS")
+        n = len(r.get("stages", []))
+        rows.append(f"{ts} · {r.get('status')} · {r.get('duration_ms')}мс · {ok}/{n}")
+    return rows
 
 
 class PipeWindow:
@@ -46,10 +71,11 @@ class PipeWindow:
             checkpoint=str(Path(target) / "forge-pipe-checkpoint.json"),
             on_event=self.events.put,
         )
+        self.titles = {s.name: s.title for s in DEFAULT_STAGES}
         self._resume = resume  # стартовый флаг (CLI --resume); кнопки меняют его в start()
+        self._t0 = 0.0
         self.thread: threading.Thread | None = None
         self.states: dict[str, str] = {s.name: "PENDING" for s in DEFAULT_STAGES}
-        self._resume = resume
         self._build()
 
     # ---------- UI construction (window opens HERE, nowhere else) ----------
@@ -69,12 +95,21 @@ class PipeWindow:
         st.configure("TLabel", background=bg, foreground=fg)
         st.configure("TButton", background="#23232e", foreground=fg)
         st.configure("Horizontal.TProgressbar", background=acc2)
+        st.configure("TNotebook", background=bg)
+        st.configure("TNotebook.Tab", background="#23232e", foreground=fg)
         top = ttk.Frame(self.root, padding=8)
         top.pack(fill="x")
         ttk.Label(top, text=f"Проект: {self.target}").pack(side="left")
         self.status = ttk.Label(top, text="готов")
         self.status.pack(side="right")
-        mid = ttk.Frame(self.root, padding=8)
+        nb = ttk.Notebook(self.root)
+        nb.pack(fill="both", expand=True)
+        tab_pipe = ttk.Frame(nb, padding=2)
+        tab_hist = ttk.Frame(nb, padding=8)
+        nb.add(tab_pipe, text="Конвейер")
+        nb.add(tab_hist, text="История")
+        self.nb = nb
+        mid = ttk.Frame(tab_pipe, padding=8)
         mid.pack(fill="both", expand=True)
         self.stages = tk.Listbox(mid, width=34, font=("Consolas", 11),
                                  bg="#1e1e28", fg=fg, selectbackground=acc,
@@ -86,7 +121,7 @@ class PipeWindow:
                                              insertbackground=fg,
                                              state="disabled")
         self.log.pack(side="left", fill="both", expand=True, padx=(8, 0))
-        bot = ttk.Frame(self.root, padding=8)
+        bot = ttk.Frame(tab_pipe, padding=8)
         bot.pack(fill="x")
         self.bar = ttk.Progressbar(bot, maximum=len(self.states), value=0)
         self.bar.pack(fill="x", pady=(0, 8))
@@ -105,9 +140,19 @@ class PipeWindow:
         ttk.Button(row, text="Закрыть", command=self._close).pack(side="left", padx=4)
         self.watcher = None
         self.last_report: dict = {}
+        # вкладка истории
+        self.hist = tk.Listbox(tab_hist, font=("Consolas", 10),
+                               bg="#101016", fg=fg,
+                               highlightthickness=0, borderwidth=0)
+        self.hist.pack(fill="both", expand=True)
+        hrow = ttk.Frame(tab_hist)
+        hrow.pack(fill="x", pady=(8, 0))
+        ttk.Button(hrow, text="↻ Обновить", command=self._refresh_history).pack(side="left")
+        nb.bind("<<NotebookTabChanged>>", lambda _e: self._refresh_history())
         self._preload()
         self._refresh_stages()
         self._refresh_cont()
+        self._refresh_history()
         self.root.protocol("WM_DELETE_WINDOW", self._close)
         self.root.after(120, self._poll)
 
@@ -125,10 +170,21 @@ class PipeWindow:
         self.log.see("end")
         self.log.configure(state="disabled")
 
+    def _refresh_history(self) -> None:
+        if not hasattr(self, "hist"):
+            return
+        self.hist.delete(0, "end")
+        rows = load_history_rows(self.target)
+        if not rows:
+            self.hist.insert("end", "(истории пока нет — запусти конвейер)")
+            return
+        for r in rows:
+            self.hist.insert("end", r)
+
     def _refresh_stages(self) -> None:
         self.stages.delete(0, "end")
         for name, st in self.states.items():
-            self.stages.insert("end", f"{icon(st)} {name}")
+            self.stages.insert("end", f"{icon(st)} {self.titles.get(name, name)}")
         if hasattr(self, "bar"):  # страховка от порядка создания виджетов
             self.bar["value"] = sum(1 for s in self.states.values()
                                     if s not in ("PENDING", "RUN"))
@@ -142,6 +198,7 @@ class PipeWindow:
         self._refresh_cont()
         self.btn_run.configure(state="disabled")
         self.btn_stop.configure(state="normal")
+        self._t0 = time.time()
         self.status.configure(text="продолжаю с чекпоинта…" if self._resume else "работает…")
         self.thread = threading.Thread(target=self._work, daemon=True)
         self.thread.start()
@@ -242,6 +299,8 @@ class PipeWindow:
         self._say(f"{name}: деталей пока нет — запусти конвейер")
 
     def _poll(self) -> None:
+        if self.thread and self.thread.is_alive() and self._t0:
+            self.status.configure(text=f"работает… {int(time.time() - self._t0)}с")
         try:
             while True:
                 ev = self.events.get_nowait()
@@ -268,6 +327,7 @@ class PipeWindow:
                     self.btn_run.configure(state="normal")
                     self.btn_stop.configure(state="disabled")
                     self._refresh_cont()
+                    self._refresh_history()
                 self._refresh_stages()
         except queue.Empty:
             pass

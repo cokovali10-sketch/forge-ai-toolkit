@@ -42,8 +42,10 @@ def test_fail_stops_and_exit_1(tmp_path):
     r = _mk(stages, tmp_path).run()
     assert r.status == "FAILED"
     assert exit_code(r) == 1
-    assert [s["name"] for s in r.stages] == ["a", "x"]  # b never ran
+    assert [s["name"] for s in r.stages] == ["a", "x", "b"]  # параллельно: все добегают
     assert r.stages[1]["status"] == "ERROR"
+    r2 = _mk(stages, tmp_path).run(serial=True)
+    assert [s["name"] for s in r2.stages] == ["a", "x"]  # serial: стоп на первой упавшей
 
 
 def test_allow_fail_continues(tmp_path):
@@ -227,3 +229,57 @@ def test_heavy_stage_listed_and_gated(tmp_path):
     res = stage_lab_e2e({"target": str(tmp_path),
                          "forge_root": str(tmp_path)})
     assert res.status == "ERROR" and "env not ready" in str(res.error)
+
+
+def _sleepy(sec=0.4):
+    def _fn(_ctx):
+        import time as _t
+        _t.sleep(sec)
+        return ToolResult(status="SUCCESS", result={})
+    return _fn
+
+
+def test_parallel_batch(tmp_path):
+    import time as _t
+    mk = lambda ss: _mk([Stage(n, n.upper(), _sleepy()) for n in ss], tmp_path)
+    t0 = _t.time()
+    r = mk(["a", "b", "c"]).run()
+    wall = _t.time() - t0
+    assert r.status == "SUCCESS"
+    assert [s["name"] for s in r.stages] == ["a", "b", "c"]  # порядок объявлений
+    assert wall < 1.0, f"not parallel: {wall:.2f}s"
+    t0 = _t.time()
+    r2 = mk(["a", "b", "c"]).run(serial=True)
+    assert _t.time() - t0 > 1.1
+    assert r2.status == "SUCCESS"
+
+
+def test_parallel_failure_and_heavy_skip(tmp_path):
+    stages = [Stage("a", "A", _ok_fn), Stage("x", "X", _boom_fn),
+              Stage("h", "H", _ok_fn, heavy=True, timeout_s=5)]
+    r = _mk(stages, tmp_path).run()
+    assert r.status == "FAILED"
+    got = {s["name"]: s["status"] for s in r.stages}
+    assert got == {"a": "SUCCESS", "x": "ERROR", "h": "SKIPPED"}
+    # serial: стоп на упавшей, тяжёлая помечена пропущенной
+    r2 = _mk(stages, tmp_path).run(serial=True)
+    got2 = {s["name"]: s["status"] for s in r2.stages}
+    assert got2 == {"a": "SUCCESS", "x": "ERROR", "h": "SKIPPED"}
+
+
+def test_history_rows_and_marks(tmp_path):
+    import json as _json
+    from forge.pipe.window import fmt_entry, icon, load_history_rows
+    assert load_history_rows(str(tmp_path)) == []
+    assert icon("SKIPPED") != "?"
+    assert "(кэш)" in fmt_entry({"name": "a", "title": "T",
+                                 "status": "SUCCESS", "duration_ms": 3,
+                                 "cached": True})
+    (tmp_path / ".forge-pipe-history.jsonl").write_text(
+        _json.dumps({"ts": 1700000000, "status": "SUCCESS",
+                     "duration_ms": 500,
+                     "stages": [{"name": "a", "status": "SUCCESS"},
+                                {"name": "b", "status": "FAILED"}]})
+        + "\nbad-line\n", encoding="utf-8")
+    rows = load_history_rows(str(tmp_path))
+    assert len(rows) == 1 and "SUCCESS" in rows[0] and "1/2" in rows[0]
