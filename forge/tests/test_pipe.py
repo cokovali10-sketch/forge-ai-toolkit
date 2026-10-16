@@ -104,3 +104,26 @@ def test_review_stage_reads_suppress_file(tmp_path):
         encoding="utf-8")
     res = stage_review({"target": str(tmp_path), "forge_root": str(tmp_path)})
     assert res.status == "SUCCESS"
+
+
+def test_run_appends_history(tmp_path):
+    r = _mk([Stage("a", "A", _ok_fn)], tmp_path).run()
+    assert r.status == "SUCCESS"
+    hist = tmp_path / ".forge-pipe-history.jsonl"
+    assert hist.is_file()
+    row = json.loads(hist.read_text(encoding="utf-8").strip().splitlines()[-1])
+    assert row["status"] == "SUCCESS" and row["stages"][0]["name"] == "a"
+
+
+def test_mcp_pipe_tools(tmp_path):
+    from forge.mcp.server import build_default_registry
+    reg = build_default_registry("")
+    names = sorted(reg.tool_owner)
+    assert "pipe.stages" in names and "pipe.run" in names and "pipe.status" in names
+    lst = reg.call("pipe.stages", {})
+    assert [s["name"] for s in lst["data"]["stages"]] == ["inspect", "review", "skills", "knowledge"]
+    rep = reg.call("pipe.run", {"root": str(tmp_path), "only": "inspect"})
+    assert rep["data"]["status"] == "SUCCESS"
+    assert [s["name"] for s in rep["data"]["stages"]] == ["inspect"]
+    st = reg.call("pipe.status", {"root": str(tmp_path)})
+    assert isinstance(st["data"]["history"], list) and len(st["data"]["history"]) >= 1

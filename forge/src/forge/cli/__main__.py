@@ -353,7 +353,7 @@ def _pipe(args: list[str]) -> int:
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
     if not args or args[0] in ("-h", "--help", "help") or args[0] not in ("run", "window"):
-        print("usage: forge pipe run <dir> [--json] [--resume] [--report PATH]")
+        print("usage: forge pipe run <dir> [--json] [--resume] [--report PATH] [--only inspect,review]")
         print("       forge pipe window [dir] [--resume]")
         print("run = headless для ИИ (окна нет), window = окно для человека")
         return 0 if args and args[0] in ("-h", "--help", "help") else 2
@@ -369,10 +369,21 @@ def _pipe(args: list[str]) -> int:
     # headless run: окна нет никогда, только stdout + exit code
     as_json = "--json" in rest
     rep_path = None
+    only = ""
     for i, a in enumerate(rest):
         if a == "--report" and i + 1 < len(rest):
             rep_path = rest[i + 1]
-    runner = PipeRunner(DEFAULT_STAGES, {"target": target, "forge_root": str(ROOT)},
+        if a == "--only" and i + 1 < len(rest):
+            only = rest[i + 1]
+    stages = DEFAULT_STAGES
+    if only:
+        want = {s.strip() for s in only.split(",") if s.strip()}
+        stages = [s for s in DEFAULT_STAGES if s.name in want]
+        if not stages:
+            print(f"unknown stages: {only} (есть: "
+                  + ",".join(s.name for s in DEFAULT_STAGES) + ")")
+            return 2
+    runner = PipeRunner(stages, {"target": target, "forge_root": str(ROOT)},
                         checkpoint=str(Path(target) / "forge-pipe-checkpoint.json"))
     report = runner.run(resume=resume)
     out = report.to_dict()

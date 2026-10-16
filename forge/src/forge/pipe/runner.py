@@ -119,8 +119,29 @@ class PipeRunner:
         finally:
             pool.shutdown(wait=False, cancel_futures=True)
         report.duration_ms = int((time.time() - t0) * 1000)
+        self._append_history(report)
         self._emit("finished", report.to_dict())
         return report
+
+    def _append_history(self, report: PipeReport) -> None:
+        """Одна строка на прогон: тренды видны без открытия отчётов."""
+        try:
+            base = Path(str(self.ctx.get("target", "")))
+            if not base.is_dir():
+                return
+            import time as _t
+            line = json.dumps(
+                {"ts": int(_t.time()), "status": report.status,
+                 "duration_ms": report.duration_ms,
+                 "stages": [{"name": s["name"], "status": s.get("status"),
+                             "duration_ms": s.get("duration_ms", 0)}
+                            for s in report.stages]},
+                ensure_ascii=False)
+            with open(base / ".forge-pipe-history.jsonl", "a",
+                      encoding="utf-8") as f:
+                f.write(line + "\n")
+        except OSError:
+            pass
 
 
 def exit_code(report: PipeReport) -> int:

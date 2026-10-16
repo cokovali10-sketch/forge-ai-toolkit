@@ -4,7 +4,9 @@
 - pipe: conveyor `forge pipe run` (headless JSON + exit codes + checkpoints/resume)
   and `forge pipe window` (tkinter, dark theme, stage details, preload)
 - quality.review: `.forge-suppress.json` suppressions (reason required, visible in report)
-- 63 tests green; pipe passes on its own repo (SUCCESS, 4/4)
+- pipe as MCP tools (`pipe.stages`/`pipe.run`/`pipe.status`), `--only` stages,
+  run history (`.forge-pipe-history.jsonl`), window «Продолжить» button
+- 65 tests green; pipe passes on its own repo (SUCCESS, 4/4)
 
 ## 0.10.0
 - MCP: minecraft.* (metadata/permissions/compat/logs via Anvil), knowledge.*,

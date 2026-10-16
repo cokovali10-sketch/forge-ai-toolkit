@@ -43,7 +43,9 @@ python -m venv .venv
 - Жизненный цикл модулей (enable/disable), генерируемые каталоги (`forge docs`)
 - Конвейер `pipe`: осмотр → ревью → скиллы → знания. Headless для ИИ
   (`forge pipe run`, JSON + exit codes + чекпоинты), окно для человека
-  (`forge pipe window`, tkinter, ноль зависимостей)
+  (`forge pipe window`, tkinter, ноль зависимостей). Как MCP-инструменты
+  (`pipe.stages`/`pipe.run`/`pipe.status`), выборочные стадии (`--only`),
+  подавитель шума (`.forge-suppress.json`), история прогонов, кнопка «Продолжить»
 
 ## Статус / Status
 

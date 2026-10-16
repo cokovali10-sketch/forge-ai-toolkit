@@ -109,6 +109,7 @@ def build_default_registry(anvil_dir: str = "") -> Registry:
                              "0.1.0", [t[0] for t in TOOLS]))
     _wire_lab(reg, local)
     _wire_ui(reg, local)
+    _wire_pipe(reg, local)
     _wire_more(reg, local, anvil_dir)
     if anvil_dir and Path(anvil_dir, "anvil_call.py").is_file():
         reg.add_backend("anvil", AnvilBackend(anvil_dir))
@@ -162,6 +163,60 @@ def _brief_dict(br) -> dict:
     return {"style": br.style, "screens": br.screens, "features": br.features,
             "strategy": st["key"], "strategy_name": st["name"],
             "notes": br.notes}
+
+
+def _wire_pipe(reg, local) -> None:
+    """Conveyor as MCP tools: any external agent can trigger the pipe."""
+    from ..core.registry import ToolDef
+    from ..pipe.runner import PipeRunner
+    from ..pipe.stages import DEFAULT_STAGES
+    from pathlib import Path as _P
+
+    def _selected(only: str) -> list:
+        if not only:
+            return DEFAULT_STAGES
+        want = {s.strip() for s in only.split(",") if s.strip()}
+        return [s for s in DEFAULT_STAGES if s.name in want]
+
+    local.add(ToolDef("pipe.stages", "List conveyor stages", level=0),
+              lambda p: {"stages": [
+                  {"name": s.name, "title": s.title,
+                   "timeout_s": s.timeout_s, "allow_fail": s.allow_fail,
+                   "notes": s.notes} for s in DEFAULT_STAGES]})
+    local.add(ToolDef("pipe.run", "Run conveyor headless, returns report",
+                      level=2, timeout=900),
+              lambda p: PipeRunner(
+                  _selected(str(p.get("only", "") or "")),
+                  {"target": p.get("root", "."),
+                   "forge_root": str(_P(__file__).resolve().parents[3])},
+                  checkpoint=str(_P(str(p.get("root", "."))) /
+                                 "forge-pipe-checkpoint.json")).run(
+                  resume=bool(p.get("resume", False))).to_dict())
+    local.add(ToolDef("pipe.status", "Checkpoint + history tail", level=0),
+              lambda p: _pipe_status(str(p.get("root", "."))))
+    reg.add_module(ModuleDef("pipe", "Conveyor pipeline tools", "0.1.0",
+                             ["pipe.stages", "pipe.run", "pipe.status"]))
+
+
+def _pipe_status(root: str) -> dict:
+    from pathlib import Path as _P
+    import json as _json
+    base = _P(root)
+    out: dict = {"checkpoint": None, "history": []}
+    cp = base / "forge-pipe-checkpoint.json"
+    if cp.is_file():
+        try:
+            out["checkpoint"] = _json.loads(cp.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            out["checkpoint"] = {"error": "unreadable"}
+    hist = base / ".forge-pipe-history.jsonl"
+    if hist.is_file():
+        try:
+            lines = hist.read_text(encoding="utf-8").splitlines()[-5:]
+            out["history"] = [_json.loads(l) for l in lines if l.strip()]
+        except (OSError, ValueError):
+            pass
+    return out
 
 
 def _wire_more(reg, local, anvil_dir: str) -> None:
