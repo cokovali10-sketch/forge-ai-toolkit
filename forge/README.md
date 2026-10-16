@@ -71,6 +71,16 @@ python -m venv .venv
 `SCOREBOARD.md` перегенерируется каждым прогоном. Только явный запуск —
 никакой автоматики.
 
+## Report Hub и VS Code
+
+```bat
+.venv\Scripts\python -m forge.cli pipe hub D:/PortfolioProjects [--open]
+```
+
+Веб-дашборд здоровья проектов (только чтение, автообновление 10с).
+Расширение VS Code (`editors/vscode`, `forge-pipe-0.1.0.vsix` в релизах):
+команда «FORGE: прогнать конвейер», находки — в панель Problems.
+
 ## Языковые модули
 
 По одному эксперту на язык — `python`, `javascript`, `rust`, `cpp`, `go`

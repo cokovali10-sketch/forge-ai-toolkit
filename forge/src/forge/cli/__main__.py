@@ -461,13 +461,14 @@ def _lang(args: list[str]) -> int:
 def _pipe(args: list[str]) -> int:
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
-    if not args or args[0] in ("-h", "--help", "help") or args[0] not in ("run", "window", "watch", "heal", "init-ci", "all"):
+    if not args or args[0] in ("-h", "--help", "help") or args[0] not in ("run", "window", "watch", "heal", "init-ci", "all", "hub"):
         print("usage: forge pipe run <dir> [--json] [--resume] [--report PATH] [--only inspect,review] [--heavy] [--serial] [--sarif PATH] [--no-plugins] [--changed]")
         print("       run = быстрые параллельно (--serial = строго по очереди)")
         print("       run = быстрые параллельно (--serial = строго по очереди)")
         print("       forge pipe window [dir] [--resume]  (окно: только быстрые стадии)")
         print("       forge pipe watch <dir> [--only ...] [--interval S]")
         print("       forge pipe heal <dir> [--json] [--serial]")
+        print("       forge pipe hub <dir> [--port 8099] [--open]  (дашборд, только чтение)")
         print("       forge pipe init-ci [dir]  (workflow + SARIF + бейдж)")
         print("       forge pipe all <dir> [--json] [--clean]  (все подпроекты разом)")
         print("run = headless для ИИ (окна нет), window = окно для человека,")
@@ -583,6 +584,16 @@ def _pipe(args: list[str]) -> int:
     if mode == "window":
         from forge.pipe.window import main as _win
         return _win(target, str(ROOT), resume)
+    if mode == "hub":
+        from forge.pipe.hub import serve as _serve
+        port = 8099
+        for i, a in enumerate(rest):
+            if a == "--port" and i + 1 < len(rest):
+                try:
+                    port = int(rest[i + 1])
+                except ValueError:
+                    pass
+        return _serve(target, port, "--open" in rest)
     if mode == "heal":
         from forge.pipe.heal import heal as _heal
         out = _heal(target, str(ROOT), serial="--serial" in rest)

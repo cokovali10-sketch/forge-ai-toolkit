@@ -514,3 +514,38 @@ def test_hold_the_line_git(tmp_path):
     assert res.status == "FAILED"
     files = {f["file"] for f in res.result["findings"]}
     assert files == {"b.py"}  # старый TODO в a.py не тронут
+
+
+def test_hub_collect_and_serve(tmp_path):
+    import json as _json
+    import threading as _th
+    import time as _t
+    import urllib.request as _url
+    from forge.pipe import hub as _hub
+    assert _hub.collect_projects(tmp_path / "nope") == []
+    (tmp_path / "p1").mkdir()
+    (tmp_path / "p1" / ".forge-pipe-history.jsonl").write_text(
+        _json.dumps({"ts": 1, "status": "SUCCESS", "duration_ms": 10,
+                     "stages": []}) + "\n"
+        + _json.dumps({"ts": 2, "status": "FAILED", "duration_ms": 20,
+                       "stages": []}) + "\n"
+        + "garbage\n", encoding="utf-8")
+    (tmp_path / "p2").mkdir()
+    rows = _hub.collect_projects(tmp_path)
+    assert [(r["project"], r["status"], r["runs"], r["ok_rate"])
+            for r in rows] == [("p1", "FAILED", 2, 0.5), ("p2", "—", 0, None)]
+    srv = _hub.ThreadingHTTPServer(("127.0.0.1", 0),
+                                   type("H", (_hub._Handler,), {}))
+    srv.RequestHandlerClass.root = str(tmp_path)
+    th = _th.Thread(target=srv.serve_forever, daemon=True)
+    th.start()
+    try:
+        base = f"http://127.0.0.1:{srv.server_port}"
+        page = _url.urlopen(base + "/", timeout=5).read().decode("utf-8")
+        assert "FORGE" in page and "p1" in page
+        api = _json.loads(_url.urlopen(base + "/api/projects",
+                                       timeout=5).read().decode("utf-8"))
+        assert api[0]["project"] == "p1"
+    finally:
+        srv.shutdown()
+        th.join(timeout=5)

@@ -32,6 +32,8 @@
   --no-plugins, corrupt-data tolerance, backup failure paths, secrets untouched
 - arena: `bench arena` records runs, `bench board` renders public scoreboard
   (latest-per-agent, raw jsonl kept); miner is manual-only by policy
+- hub: `pipe hub` web dashboard (read-only, auto-refresh, JSON API)
+- vscode extension packaged (forge-pipe-0.1.0.vsix, syntax verified with node)
 
 ## 0.10.0
 - MCP: minecraft.* (metadata/permissions/compat/logs via Anvil), knowledge.*,
