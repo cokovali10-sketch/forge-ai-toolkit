@@ -23,6 +23,8 @@
 - cache correctness: suppress file in review fingerprint, cached FAIL counts
 - live proof: full --heavy run green incl. real 63s Purpur boot
 - 81 tests green; pipe passes on its own repo (SUCCESS, 5/5)
+- hardening: walk limits + onerror, history rotation (200), safe report writes,
+  --no-plugins, corrupt-data tolerance, backup failure paths, secrets untouched
 
 ## 0.10.0
 - MCP: minecraft.* (metadata/permissions/compat/logs via Anvil), knowledge.*,

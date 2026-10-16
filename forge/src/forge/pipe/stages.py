@@ -40,7 +40,8 @@ def tree_hash(root: str | Path, exts: set[str] | None = None) -> str:
     base = Path(root)
     if not base.is_dir():
         return "no-dir"
-    for dirpath, dirnames, filenames in os.walk(base):
+    n = 0
+    for dirpath, dirnames, filenames in os.walk(base, onerror=lambda e: None):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
         for fn in sorted(filenames):
             if fn in ("forge-pipe-checkpoint.json", "forge-pipe-report.json",
@@ -48,12 +49,19 @@ def tree_hash(root: str | Path, exts: set[str] | None = None) -> str:
                 continue
             if exts is not None and Path(fn).suffix.lower() not in exts:
                 continue
+            n += 1
+            if n > 30000:
+                h.update(b"|CAPPED|")
+                dirnames[:] = []
+                break
             fp = Path(dirpath) / fn
             try:
                 st = fp.stat()
                 h.update(f"{fp.relative_to(base)}|{st.st_size}|{st.st_mtime_ns}\n".encode())
             except OSError:
                 pass
+        if n > 30000:
+            break
     return h.hexdigest()[:16]
 
 
@@ -82,10 +90,15 @@ def stage_inspect(ctx: dict[str, Any]) -> ToolResult:
         lines = 0
         build: list[str] = []
         n_files = 0
-        for dirpath, dirnames, filenames in __import__("os").walk(root):
+        capped = False
+        for dirpath, dirnames, filenames in __import__("os").walk(root, onerror=lambda e: None):
             dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
             for fn in filenames:
                 n_files += 1
+                if n_files > 30000:
+                    capped = True
+                    dirnames[:] = []
+                    break
                 suf = Path(fn).suffix.lower() or "<noext>"
                 by_ext[suf] = by_ext.get(suf, 0) + 1
                 if fn in ("pom.xml", "build.gradle", "build.gradle.kts",
@@ -101,8 +114,13 @@ def stage_inspect(ctx: dict[str, Any]) -> ToolResult:
                             lines += sum(1 for _ in fh)
                     except OSError:
                         pass
-        return {"files": n_files, "by_ext": by_ext, "code_lines": lines,
-                "build_files": build[:20]}
+            if capped:
+                break
+        out = {"files": n_files, "by_ext": by_ext, "code_lines": lines,
+               "build_files": build[:20]}
+        if capped:
+            out["capped"] = "дерево >30000 файлов: осмотр частичный"
+        return out
     return timed(run)
 
 
@@ -153,10 +171,11 @@ def stage_knowledge(ctx: dict[str, Any]) -> ToolResult:
     def run() -> dict:
         from forge.knowledge.store import KnowledgeStore
         ks = KnowledgeStore()
-        seed = Path(ctx["forge_root"]) / "knowledge" / "seed.jsonl"
         docs = 0
-        if seed.is_file():
-            docs = ks.load_jsonl(seed)
+        for fn in ("seed.jsonl", "mined.jsonl"):
+            p = Path(ctx["forge_root"]) / "knowledge" / fn
+            if p.is_file():
+                docs += ks.load_jsonl(p)
         probe = ks.search("java plugin build", limit=3)
         return {"docs": docs, "probe_hits": len(probe)}
     r = timed(run)

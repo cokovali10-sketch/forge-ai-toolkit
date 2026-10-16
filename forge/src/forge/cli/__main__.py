@@ -26,9 +26,10 @@ def _knowledge():
     sys.path.insert(0, str(ROOT / "src"))
     from forge.knowledge.store import KnowledgeStore
     ks = KnowledgeStore()
-    seed = ROOT / "knowledge" / "seed.jsonl"
-    if seed.is_file():
-        ks.load_jsonl(seed)
+    for fn in ("seed.jsonl", "mined.jsonl"):
+        seed = ROOT / "knowledge" / fn
+        if seed.is_file():
+            ks.load_jsonl(seed)
     return ks
 
 
@@ -367,11 +368,36 @@ jobs:
 """
 
 
+def _know_mine(args: list[str]) -> int:
+    """forge know mine <dir> [--apply]: превью найденного, --apply пишет в mined.jsonl."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.knowledge.mine import load_titles, mine_repo
+    target = next((a for a in args if not a.startswith("--")), ".")
+    entries = mine_repo(target)
+    if not entries:
+        print("фактов не найдено (пусто или нет манифестов) — ничего не выдумываю")
+        return 0
+    for e in entries:
+        print(f"[{e['domain']}] {e['title']}\n  {e['body'][:200]}\n")
+    if "--apply" not in args:
+        print(f"превью: {len(entries)} записей. Добавь --apply чтобы записать.")
+        return 0
+    mp = ROOT / "knowledge" / "mined.jsonl"
+    have = load_titles(ROOT / "knowledge" / "seed.jsonl") | load_titles(mp)
+    fresh = [e for e in entries if (e["domain"], e["title"]) not in have]
+    with open(mp, "a", encoding="utf-8") as f:
+        for e in fresh:
+            f.write(_json.dumps(e, ensure_ascii=False) + "\n")
+    print(f"записано новых: {len(fresh)} из {len(entries)} (-> knowledge/mined.jsonl)")
+    return 0
+
+
 def _pipe(args: list[str]) -> int:
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
     if not args or args[0] in ("-h", "--help", "help") or args[0] not in ("run", "window", "watch", "heal", "init-ci", "all"):
-        print("usage: forge pipe run <dir> [--json] [--resume] [--report PATH] [--only inspect,review] [--heavy] [--serial] [--sarif PATH]")
+        print("usage: forge pipe run <dir> [--json] [--resume] [--report PATH] [--only inspect,review] [--heavy] [--serial] [--sarif PATH] [--no-plugins]")
         print("       run = быстрые параллельно (--serial = строго по очереди)")
         print("       forge pipe window [dir] [--resume]  (окно: только быстрые стадии)")
         print("       forge pipe watch <dir> [--only ...] [--interval S]")
@@ -411,10 +437,22 @@ def _pipe(args: list[str]) -> int:
             raise SystemExit(2)
         return stages
 
+    def _safe_write(path: str, text: str) -> bool:
+        """Запись отчёта: создаёт папки, не роняет конвейер при ошибке."""
+        try:
+            p = Path(path)
+            if p.parent and str(p.parent) not in (".", ""):
+                p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(text, encoding="utf-8")
+            return True
+        except OSError as e:
+            print(f"не записал {path}: {e}")
+            return False
+
     def _with_plugins(stages: list) -> list:
         from forge.pipe.plugins import load_plugins
-        if only:
-            return stages  # --only = ровно то, что просили
+        if only or "--no-plugins" in rest:
+            return stages  # --only = ровно то, что просили; --no-plugins = только свои
         plug, skipped = load_plugins(target)
         for f, e in skipped.items():
             print(f"плагин {f} пропущен: {e}")
@@ -527,12 +565,10 @@ def _pipe(args: list[str]) -> int:
     out = report.to_dict()
     if sarif_path:
         from forge.pipe.sarif import report_to_sarif
-        Path(sarif_path).write_text(_json.dumps(report_to_sarif(out, target),
-                                                ensure_ascii=False, indent=2),
-                                    encoding="utf-8")
+        _safe_write(sarif_path, _json.dumps(report_to_sarif(out, target),
+                                            ensure_ascii=False, indent=2))
     if rep_path:
-        Path(rep_path).write_text(_json.dumps(out, ensure_ascii=False, indent=2),
-                                  encoding="utf-8")
+        _safe_write(rep_path, _json.dumps(out, ensure_ascii=False, indent=2))
     if as_json:
         print(_json.dumps(out, ensure_ascii=False))
     else:
@@ -587,6 +623,8 @@ def main(argv: list[str] | None = None) -> int:
         print("usage: forge skills [list|validate]")
         return 2
     if cmd == "know":
+        if len(args) > 1 and args[1] == "mine":
+            return _know_mine(args[2:])
         ks = _knowledge()
         for r in ks.search(" ".join(args[1:]), limit=5):
             print(f"[{r['domain']}] {r['title']}\n{r['body'][:400]}\n")

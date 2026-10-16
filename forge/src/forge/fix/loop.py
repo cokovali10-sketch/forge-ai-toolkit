@@ -47,13 +47,19 @@ def checkpoint(project: str | Path) -> dict:
                 return {"ok": False, "error": f"stash failed: {out[:300]}"}
             handle.update(kind="git-stash", head=head)
     else:
-        size_mb = sum(f.stat().st_size for f in p.rglob("*") if f.is_file()) / 1e6
+        try:
+            size_mb = sum(f.stat().st_size for f in p.rglob("*") if f.is_file()) / 1e6
+        except OSError as e:
+            return {"ok": False, "error": f"cannot scan project: {e}"}
         if size_mb > MAX_BACKUP_MB:
             return {"ok": False,
                     "error": f"project too large for copy backup ({size_mb:.0f}MB)"}
         backup = Path(str(p) + f".forge-bak-{int(time.time() * 1000)}")
-        shutil.copytree(p, backup, ignore=shutil.ignore_patterns(
-            ".git", "__pycache__", ".venv", "node_modules", "build", ".gradle"))
+        try:
+            shutil.copytree(p, backup, ignore=shutil.ignore_patterns(
+                ".git", "__pycache__", ".venv", "node_modules", "build", ".gradle"))
+        except OSError as e:
+            return {"ok": False, "error": f"backup failed: {e}"}
         handle.update(kind="copy", backup=str(backup))
     handle["ok"] = True
     (p / STATE).write_text(json.dumps(handle, indent=2), encoding="utf-8")

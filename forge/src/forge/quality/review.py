@@ -22,16 +22,19 @@ def review(root: str | Path, max_files: int = 500,
 
     Подавление БЕЗ причины не действует. Подавленные находки остаются
     в findings с флагом suppressed (видны, но не считаются confirmed).
+    Обход безопасен: skip-dir'ы, игнор ошибок доступа, лимит файлов, без симлинков.
     """
     base = Path(root)
     files: list[Path] = []
-    for dirpath, dirnames, filenames in __import__("os").walk(base):
+    for dirpath, dirnames, filenames in __import__("os").walk(base, onerror=lambda e: None):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
         for fn in filenames:
             if Path(fn).suffix in CODE_EXTS:
                 files.append(Path(dirpath) / fn)
                 if len(files) >= max_files:
                     break
+        if len(files) >= max_files:
+            break  # дальше не идём: лимит защищает от гигантских деревьев
     findings: list[dict] = []
     total_lines = 0
     for fp in files:

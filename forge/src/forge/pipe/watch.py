@@ -24,18 +24,25 @@ def snapshot(root: str | Path) -> dict[str, float]:
     out: dict[str, float] = {}
     if not base.is_dir():
         return out
-    for dirpath, dirnames, filenames in __import__("os").walk(base):
+    n = 0
+    for dirpath, dirnames, filenames in __import__("os").walk(base, onerror=lambda e: None):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
         for fn in filenames:
             if fn in SKIP_FILES:
                 continue
             if Path(fn).suffix.lower() not in WATCH_EXTS:
                 continue
+            n += 1
+            if n > 30000:
+                dirnames[:] = []
+                break
             fp = Path(dirpath) / fn
             try:
                 out[str(fp.relative_to(base))] = fp.stat().st_mtime
             except OSError:
                 pass
+        if n > 30000:
+            break
     return out
 
 

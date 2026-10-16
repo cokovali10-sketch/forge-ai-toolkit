@@ -228,9 +228,17 @@ def _pipe_status(root: str) -> dict:
     hist = base / ".forge-pipe-history.jsonl"
     if hist.is_file():
         try:
-            lines = hist.read_text(encoding="utf-8").splitlines()[-5:]
-            out["history"] = [_json.loads(l) for l in lines if l.strip()]
-        except (OSError, ValueError):
+            rows = []
+            for line in hist.read_text(encoding="utf-8").splitlines()[-5:]:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rows.append(_json.loads(line))
+                except ValueError:
+                    continue  # битая строка не валит весь статус
+            out["history"] = rows
+        except OSError:
             pass
     return out
 

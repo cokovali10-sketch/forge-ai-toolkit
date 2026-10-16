@@ -253,7 +253,7 @@ class PipeRunner:
         return report
 
     def _append_history(self, report: PipeReport) -> None:
-        """Одна строка на прогон: тренды видны без открытия отчётов."""
+        """Одна строка на прогон + ротация (последние 200): файл не растёт вечно."""
         try:
             base = Path(str(self.ctx.get("target", "")))
             if not base.is_dir():
@@ -266,9 +266,15 @@ class PipeRunner:
                              "duration_ms": s.get("duration_ms", 0)}
                             for s in report.stages]},
                 ensure_ascii=False)
-            with open(base / ".forge-pipe-history.jsonl", "a",
-                      encoding="utf-8") as f:
+            hp = base / ".forge-pipe-history.jsonl"
+            with open(hp, "a", encoding="utf-8") as f:
                 f.write(line + "\n")
+            try:
+                lines = hp.read_text(encoding="utf-8").splitlines()
+                if len(lines) > 200:
+                    hp.write_text("\n".join(lines[-200:]) + "\n", encoding="utf-8")
+            except OSError:
+                pass
         except OSError:
             pass
 

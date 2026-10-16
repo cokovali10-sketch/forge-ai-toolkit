@@ -382,3 +382,58 @@ def test_cached_failure_still_fails(tmp_path):
     assert calls == [1]  # второй раз из кэша
     assert r2.stages[0].get("cached") is True
     assert r2.status == "FAILED"  # но статус честный
+
+
+def test_safety_hardening(tmp_path):
+    import json as _json
+    from forge.cli.__main__ import main
+    from forge.pipe.runner import PipeRunner
+    from forge.pipe.stages import DEFAULT_STAGES
+    # 1. ротация истории: 205 строк -> остаётся 200
+    mk = lambda: PipeRunner(list(DEFAULT_STAGES),
+                            {"target": str(tmp_path),
+                             "forge_root": str(tmp_path)},
+                            checkpoint=str(tmp_path / "cp.json"))
+    hp = tmp_path / ".forge-pipe-history.jsonl"
+    hp.write_text("\n".join([_json.dumps({"ts": 1, "status": "SUCCESS",
+                                          "duration_ms": 1, "stages": []})
+                              for _ in range(205)]), encoding="utf-8")
+    mk().run()
+    assert len(hp.read_text(encoding="utf-8").splitlines()) == 200
+    # 2. битая строка истории не валит pipe.status
+    with open(hp, "a", encoding="utf-8") as f:
+        f.write("not-json{{{\n")
+    from forge.mcp.server import _pipe_status
+    st = _pipe_status(str(tmp_path))
+    assert isinstance(st["history"], list)
+    # 3. --report в несуществующую вложенность: папки создаются
+    deep = tmp_path / "a" / "b" / "rep.json"
+    assert main(["pipe", "run", str(tmp_path), "--report", str(deep),
+                 "--only", "inspect"]) == 0
+    assert deep.is_file()
+    # 4. --no-plugins: чужой код не выполняется
+    plug = tmp_path / ".forge-stages"
+    plug.mkdir()
+    (plug / "evil.py").write_text(
+        "from forge.pipe.stages import Stage\n"
+        "from forge.core.result import ToolResult\n"
+        "STAGE = Stage('evil', 'Evil', "
+        "lambda c: ToolResult(status='FAILED', error={'message': 'pwned'}))\n",
+        encoding="utf-8")
+    rep = tmp_path / "r1.json"
+    assert main(["pipe", "run", str(tmp_path), "--report", str(rep),
+                 "--only", "inspect"]) == 0
+    names = [s["name"] for s in
+             _json.loads(rep.read_text(encoding="utf-8"))["stages"]]
+    assert "evil" not in names  # --only = ровно то, что просили
+    rep2 = tmp_path / "r2.json"
+    assert main(["pipe", "run", str(tmp_path), "--report", str(rep2),
+                 "--no-plugins"]) == 0
+    names2 = [s["name"] for s in
+              _json.loads(rep2.read_text(encoding="utf-8"))["stages"]]
+    assert "evil" not in names2
+    rep3 = tmp_path / "r3.json"
+    main(["pipe", "run", str(tmp_path), "--report", str(rep3)])
+    names3 = [s["name"] for s in
+              _json.loads(rep3.read_text(encoding="utf-8"))["stages"]]
+    assert "evil" in names3  # а по умолчанию плагин подхватывается
