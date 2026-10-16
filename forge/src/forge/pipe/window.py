@@ -46,9 +46,10 @@ class PipeWindow:
             checkpoint=str(Path(target) / "forge-pipe-checkpoint.json"),
             on_event=self.events.put,
         )
-        self.resume = resume
+        self._resume = resume  # стартовый флаг (CLI --resume); кнопки меняют его в start()
         self.thread: threading.Thread | None = None
         self.states: dict[str, str] = {s.name: "PENDING" for s in DEFAULT_STAGES}
+        self._resume = resume
         self._build()
 
     # ---------- UI construction (window opens HERE, nowhere else) ----------
@@ -80,7 +81,6 @@ class PipeWindow:
                                  highlightthickness=0, borderwidth=0)
         self.stages.pack(side="left", fill="y")
         self.stages.bind("<<ListboxSelect>>", lambda _e: self._show_details())
-        self._refresh_stages()
         self.log = scrolledtext.ScrolledText(mid, font=("Consolas", 10),
                                              bg="#101016", fg=fg,
                                              insertbackground=fg,
@@ -92,8 +92,10 @@ class PipeWindow:
         self.bar.pack(fill="x", pady=(0, 8))
         row = ttk.Frame(bot)
         row.pack()
-        self.btn_run = ttk.Button(row, text="▶ Запустить", command=self.start)
+        self.btn_run = ttk.Button(row, text="▶ Запустить", command=lambda: self.start(resume=False))
         self.btn_run.pack(side="left", padx=4)
+        self.btn_cont = ttk.Button(row, text="⏵ Продолжить", command=lambda: self.start(resume=True))
+        self.btn_cont.pack(side="left", padx=4)
         self.btn_stop = ttk.Button(row, text="■ Стоп", command=self.stop,
                                    state="disabled")
         self.btn_stop.pack(side="left", padx=4)
@@ -101,7 +103,16 @@ class PipeWindow:
         ttk.Button(row, text="Закрыть", command=self.root.destroy).pack(side="left", padx=4)
         self.last_report: dict = {}
         self._preload()
+        self._refresh_stages()
+        self._refresh_cont()
         self.root.after(120, self._poll)
+
+    def _has_checkpoint(self) -> bool:
+        return Path(self.target, "forge-pipe-checkpoint.json").is_file()
+
+    def _refresh_cont(self) -> None:
+        if hasattr(self, "btn_cont"):
+            self.btn_cont.configure(state="normal" if self._has_checkpoint() else "disabled")
 
     # ---------- runtime ----------
     def _say(self, text: str) -> None:
@@ -114,23 +125,26 @@ class PipeWindow:
         self.stages.delete(0, "end")
         for name, st in self.states.items():
             self.stages.insert("end", f"{icon(st)} {name}")
-        self.bar["value"] = sum(1 for s in self.states.values()
-                                if s not in ("PENDING", "RUN"))
+        if hasattr(self, "bar"):  # страховка от порядка создания виджетов
+            self.bar["value"] = sum(1 for s in self.states.values()
+                                    if s not in ("PENDING", "RUN"))
 
-    def start(self) -> None:
+    def start(self, resume: bool = False) -> None:
         if self.thread and self.thread.is_alive():
             return
+        self._resume = resume and self._has_checkpoint()
         self.states = {k: "PENDING" for k in self.states}
         self._refresh_stages()
+        self._refresh_cont()
         self.btn_run.configure(state="disabled")
         self.btn_stop.configure(state="normal")
-        self.status.configure(text="работает…")
+        self.status.configure(text="продолжаю с чекпоинта…" if self._resume else "работает…")
         self.thread = threading.Thread(target=self._work, daemon=True)
         self.thread.start()
 
     def _work(self) -> None:
         try:
-            report = self.runner.run(resume=self.resume)
+            report = self.runner.run(resume=self._resume)
             Path(self.report_path).write_text(
                 json.dumps(report.to_dict(), ensure_ascii=False, indent=2),
                 encoding="utf-8")
@@ -196,6 +210,8 @@ class PipeWindow:
                 data = s.get("data") or s.get("error") or {}
                 text = json.dumps(data, ensure_ascii=False, indent=2)
                 self._say(text[:3000])
+                if s.get("warnings"):
+                    self._say("предупреждения: " + "; ".join(s["warnings"]))
                 return
         self._say(f"{name}: деталей пока нет — запусти конвейер")
 
@@ -220,6 +236,7 @@ class PipeWindow:
                     self._say(f"== {rep['status']} за {rep['duration_ms']}мс; отчёт: {self.report_path}")
                     self.btn_run.configure(state="normal")
                     self.btn_stop.configure(state="disabled")
+                    self._refresh_cont()
                 self._refresh_stages()
         except queue.Empty:
             pass
