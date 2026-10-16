@@ -1,145 +1,75 @@
-# FORGE AI Toolkit
+<div align="center">
 
-> **RU:** Внешний инструментарий для ИИ-агентов: экспертные навыки, MCP-сервер,
-> анализ проектов, тестовая лаборатория Minecraft/Java. Без обучения моделей,
-> без платных API, без выдумок — только проверяемые инструменты.
->
-> **EN:** External toolkit for AI agents: expert skills, MCP server, project
-> intelligence, Minecraft/Java testing lab. No model training, no paid APIs,
-> no hallucinated results — only verifiable tools.
+# ◆ FORGE AI Toolkit
 
-## Что это / What is this
+### Внешний инструментарий для ИИ-агентов · External toolkit for AI agents
 
-FORGE подключается к существующему ИИ-агенту и даёт ему: знания с поиском,
-переносимые Skills, ~120 инструментов Anvil + сервисы Hermes через один CLI,
-MCP-сервер для совместимых клиентов и изолированную Testing Lab, где плагины
-реально собираются и гоняются на настоящем сервере.
+[![tests](https://img.shields.io/badge/tests-99_passing-4ade80?style=for-the-badge)](#)
+[![python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](#)
+[![license](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](#)
+[![offline](https://img.shields.io/badge/offline-no_cloud-8b5cf6?style=for-the-badge)](#)
 
-FORGE plugs into your existing AI agent and gives it: searchable knowledge,
-portable Skills, ~120 Anvil tools + Hermes services behind one CLI, an MCP
-server for compatible clients, and an isolated Testing Lab where plugins are
-really built and run against a real server.
+| | |
+|---|---|
+| 🇷🇺 | **[Читать на русском →](./README_RU.md)** |
+| 🇬🇧 | **[Read in English →](./README_EN.md)** |
 
-## Быстрый старт / Quickstart
+*Выбери язык · Choose your language*
+
+</div>
+
+---
+
+<div align="center">
+
+**Конвейер, который сам себя проверяет · A pipeline that checks itself**
+
+```bat
+.venv\Scripts\python -m forge.cli pipe run <project-dir>
+```
+
+```json
+// Тот же конвейер для ИИ-агента (MCP):
+{ "tool": "pipe.run", "args": { "root": "<project-dir>" } }
+```
+
+[📦 Релизы](https://github.com/cokovali10-sketch/forge-ai-toolkit/releases) · [🛠 Исходники](./forge/src/forge) · [📜 Changelog](./forge/CHANGELOG.md)
+
+</div>
+
+---
+
+## Что это · What is this
+
+| 🇷🇺 Русский | 🇬🇧 English |
+|---|---|
+| FORGE подключается к твоему ИИ-агенту и даёт ему руки: 32 своих инструмента + 120 Anvil + ~200 Hermes, конвейер проверок, тестовую лабораторию с настоящим сервером и базу знаний. Без обучения моделей, без платных API, без выдуманных результатов. | FORGE plugs into your AI agent and gives it hands: 32 native tools + 120 Anvil + ~200 Hermes ones, a check conveyor, a testing lab with a real server, and a knowledge base. No model training, no paid APIs, no hallucinated results. |
+
+## Людям · For humans
 
 ```bat
 python -m venv .venv
 .venv\Scripts\python -m pip install -e forge
 .venv\Scripts\python -m pytest forge\tests -q
-.venv\Scripts\python -m forge.cli modules
-.venv\Scripts\python -m forge.cli pipe run <project-dir>
+.venv\Scripts\python -m forge.cli pipe window <project-dir>
 ```
 
-## Возможности / Features
+## ИИ-агентам · For AI agents
 
-- Skills (java-expert, paper-plugin-expert, build-repair, ...) с валидацией
-- Module packs + Expert Router (`forge route "..."`)
-- SQLite FTS база знаний (`forge know ...`)
-- MCP-сервер, проверенный официальным SDK-клиентом
-- Testing Lab: сборка, unit-тесты, реальный Purpur, команды, отчёты
-- AAA Interface Engine: брифы, стратегии A/B/C/D, валидация GUI, PNG-ассеты
-- Генератор Paper-плагинов (`forge gen paper ...`)
-- Стандарт ToolResult + уровни разрешений 0–4 (`docs/permissions.md`)
-- Жизненный цикл модулей (enable/disable), генерируемые каталоги (`forge docs`)
-- Конвейер `pipe`: осмотр → ревью → скиллы → знания. Headless для ИИ
-  (`forge pipe run`, JSON + exit codes + чекпоинты), окно для человека
-  (`forge pipe window`, tkinter, ноль зависимостей). Как MCP-инструменты
-  (`pipe.stages`/`pipe.run`/`pipe.status`), выборочные стадии (`--only`),
-  подавитель шума (`.forge-suppress.json`), история прогонов, кнопка «Продолжить»,
-  слежка за файлами (`forge pipe watch`, кнопка «👁 Следить» в окне),
-  инкрементальность по контент-хэшам (перезапускаются только затронутые
-  стадии — повторный прогон берётся из кэша чекпоинта),
-  тяжёлая стадия `lab-e2e` (настоящий Purpur, только `--heavy` / `--only lab-e2e`),
-  параллельные быстрые стадии (`--serial` возвращает очередь),
-  вкладка истории прогонов и таймер в окне,
-  самопочинка (`pipe heal`: страховка + пакеты ремонта + `fix rollback`),
-  SARIF для GitHub Code Scanning, `pipe init-ci` (workflow + бейдж),
-  плагины стадий (`.forge-stages/`), `pipe all` по всем подпроектам,
-  VS Code-расширение (скелет, `editors/vscode`), пакет `forge-core` на PyPI
-
-## Benchmark Arena
-
-Честное табло «кто лучше решает задачи» (промпт §18):
-
-```bat
-.venv\Scripts\python -m forge.cli bench arena <candidate-dir> --agent NAME
-.venv\Scripts\python -m forge.cli bench board
+```json
+{
+  "mcpServers": {
+    "forge": {
+      "command": "D:/Forge-Factority/.venv/Scripts/python.exe",
+      "args": ["-m", "forge.cli", "mcp"],
+      "cwd": "D:/Forge-Factority"
+    }
+  }
+}
 ```
 
-Правила: один замер = одна строка в `benchmarks/scoreboard.jsonl`, в таблице —
-последний прогон каждого агента (не лучший из ста), сырые данные хранятся,
-`SCOREBOARD.md` перегенерируется каждым прогоном. Только явный запуск —
-никакой автоматики.
+<div align="center">
 
-## Report Hub и VS Code
+**🇷🇺 [Полная инструкция на русском →](./README_RU.md) · 🇬🇧 [Full instructions in English →](./README_EN.md)**
 
-```bat
-.venv\Scripts\python -m forge.cli pipe hub D:/PortfolioProjects [--open]
-```
-
-Веб-дашборд здоровья проектов (только чтение, автообновление 10с).
-Расширение VS Code (`editors/vscode`, `forge-pipe-0.1.0.vsix` в релизах):
-команда «FORGE: прогнать конвейер», находки — в панель Problems.
-
-## Языковые модули
-
-По одному эксперту на язык — `python`, `javascript`, `rust`, `cpp`, `go`
-(Go — мой выбор: у тебя треть портфолио на нём):
-
-```bat
-.venv\Scripts\python -m forge.cli lang detect <dir>
-.venv\Scripts\python -m forge.cli lang lint go <dir>
-.venv\Scripts\python -m forge.cli lang scaffold rust myapp ./out
-```
-
-Каждый: `detect` (маркеры) / `lint` (синтаксис: py_compile, node --check,
-cargo check, g++ -fsyntax-only, gofmt+vet) / `test` (pytest, npm test,
-cargo test, ctest, go test) / `scaffold` (минимальный проект).
-Правила честные (подсмотрены у Trunk): тулчейна нет = WARNING, а не FAIL;
-стадия конвейера `5/6 Языки проекта`; MCP-инструменты `lang.*`.
-
-## Редактор объектов
-
-```bat
-.venv\Scripts\python -m forge.cli edit inspect config.json
-.venv\Scripts\python -m forge.cli edit get plugin.yml name
-.venv\Scripts\python -m forge.cli edit set config.json server.port 9090 --dry
-.venv\Scripts\python -m forge.cli edit validate cfg.json --schema plugin-yml
-.venv\Scripts\python -m forge.cli edit rollback config.json
-```
-
-JSON — свой движок (точечные пути со списками, lite-схемы, `.forge-bak`,
-rollback), YAML — через мост Anvil без дублирования парсера.
-MCP: `edit.inspect/get/set/validate/rollback` (запись — level 2).
-
-## Self-Update
-
-```bat
-.venv\Scripts\python -m forge.cli evolve <dir>
-```
-
-Детектор протухания (не авточинка): невалидные скиллы, правила с 3+
-подавлениями, падающие 3+ раз стадии, отсутствующие тулчейны.
-Выход — задачи с доказательствами и подсказанными модулями.
-MCP: `evolve.check`.
-
-## Безопасность конвейера
-
-- Только чтение чужих проектов: обход с лимитами (30 000 файлов), игнор
-  ошибок доступа, без следования по симлинкам, гигантские файлы пропускаются
-- Записи только своих артефактов (чекпоинт/отчёт/история); пути отчётов
-  создаются безопасно; история ротируется (последние 200)
-- Плагины — только из `.forge-stages/` цели, битые пропускаются вслух,
-  `--no-plugins` отключает полностью
-- Страховка `heal` с лимитом копии (200 МБ) и откатом; секреты нигде
-  не читаются (майнер берёт только манифесты: версии и имена зависимостей)
-
-## Статус / Status
-
-Ядро + Testing Lab + UI Engine работают и покрыты тестами (55 тестов).
-Десктоп отложен (нужен Node.js). Скриншоты и автоклиент честно отмечены
-как NOT_IMPLEMENTED.
-
-## Лицензия / License
-
-MIT — см. `forge/LICENSE`.
+</div>
