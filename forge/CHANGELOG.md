@@ -10,7 +10,8 @@
   excluded), CLI `forge pipe watch` + «👁 Следить» toggle in window
 - pipe fingerprints: content-hash per stage, repeat runs use checkpoint cache
   (only affected stages re-run), `(кэш)` marks in output
-- 68 tests green; pipe passes on its own repo (SUCCESS, 4/4)
+- pipe heavy stage `lab-e2e` (real Purpur boot, env-gated, `--heavy` only)
+- 71 tests green; pipe passes on its own repo (SUCCESS, 4/4)
 
 ## 0.10.0
 - MCP: minecraft.* (metadata/permissions/compat/logs via Anvil), knowledge.*,

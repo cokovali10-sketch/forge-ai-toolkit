@@ -155,8 +155,7 @@ def stage_knowledge(ctx: dict[str, Any]) -> ToolResult:
     return r
 
 
-DEFAULT_STAGES: list[Stage] = [
-    Stage("inspect", "1/4 Осмотр проекта", stage_inspect, 60.0,
+DEFAULT_STAGES: list[Stage] = [    Stage("inspect", "1/4 Осмотр проекта", stage_inspect, 60.0,
           notes="структура, языки, сборка",
           fingerprint=lambda c: tree_hash(c["target"])),
     Stage("review", "2/4 Ревью кода", stage_review, 180.0,
@@ -170,3 +169,49 @@ DEFAULT_STAGES: list[Stage] = [
           fingerprint=lambda c: tree_hash(Path(c["forge_root"]) / "knowledge",
                                            {".jsonl"})),
 ]
+
+
+def _find_java() -> str:
+    import os as _os
+    cands = [_os.environ.get("FORGE_JAVA21", ""),
+             r"C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot\bin\java.exe"]
+    return next((c for c in cands if c and Path(c).is_file()), "")
+
+
+def stage_lab_e2e(ctx: dict[str, Any]) -> ToolResult:
+    """Тяжёлая стадия: настоящий Purpur + сборка фикстуры (минуты).
+
+    Без jar/JDK честно отвечает ERROR «env not ready» вместо падения.
+    В DEFAULT_STAGES не входит — только --heavy / --only lab-e2e.
+    """
+    def run() -> dict:
+        from forge.lab import runner as _r
+        root = Path(ctx["forge_root"])
+        jars = sorted((root.parent / "lab-servers").glob("purpur-*.jar"))
+        if not jars:
+            raise FileNotFoundError("env not ready: нет lab-servers/purpur-*.jar")
+        java = _find_java()
+        if not java:
+            raise FileNotFoundError("env not ready: нет JDK21 (FORGE_JAVA21)")
+        rep = _r.e2e_fixture(root.parent / "lab-runs", str(jars[0]),
+                             root / "tests" / "fixture-plugin" / "src",
+                             java_bin=java)
+        if not rep.get("ok"):
+            bad = [c.get("stage", "?") for c in rep.get("checks", [])
+                   if not c.get("ok")]
+            raise RuntimeError(f"e2e failed: {bad or 'unknown'}")
+        return {"checks": len(rep.get("checks", []))}
+    return timed(run)
+
+
+HEAVY_STAGES: list[Stage] = [
+    Stage("lab-e2e", "5/5 Lab E2E (тяжёлая)", stage_lab_e2e, 1500.0,
+          notes="Purpur + JDK21, минуты; только --heavy",
+          fingerprint=lambda c: tree_hash(
+              Path(c["forge_root"]) / "tests" / "fixture-plugin",
+              CODE_EXTS) + tree_hash(
+              Path(c["forge_root"]) / "src" / "forge" / "lab",
+              {".py"})),
+]
+
+ALL_STAGES: dict[str, Stage] = {s.name: s for s in DEFAULT_STAGES + HEAVY_STAGES}

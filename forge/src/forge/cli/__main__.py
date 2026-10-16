@@ -353,18 +353,19 @@ def _pipe(args: list[str]) -> int:
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
     if not args or args[0] in ("-h", "--help", "help") or args[0] not in ("run", "window", "watch"):
-        print("usage: forge pipe run <dir> [--json] [--resume] [--report PATH] [--only inspect,review]")
-        print("       forge pipe window [dir] [--resume]")
+        print("usage: forge pipe run <dir> [--json] [--resume] [--report PATH] [--only inspect,review] [--heavy]")
+        print("       forge pipe window [dir] [--resume]  (окно: только быстрые стадии)")
         print("       forge pipe watch <dir> [--only ...] [--interval S]")
         print("run = headless для ИИ (окна нет), window = окно для человека,")
         print("watch = слежка: перезапуск при изменении файлов")
         return 0 if args and args[0] in ("-h", "--help", "help") else 2
     from forge.pipe.runner import PipeRunner, exit_code
-    from forge.pipe.stages import DEFAULT_STAGES
+    from forge.pipe.stages import ALL_STAGES, DEFAULT_STAGES, HEAVY_STAGES
     mode = args[0]
     rest = args[1:]
     target = next((a for a in rest if not a.startswith("--")), ".")
     resume = "--resume" in rest
+    heavy = "--heavy" in rest
     only = ""
     interval = 2.0
     for i, a in enumerate(rest):
@@ -378,12 +379,12 @@ def _pipe(args: list[str]) -> int:
 
     def _select() -> list:
         if not only:
-            return DEFAULT_STAGES
+            return list(DEFAULT_STAGES) + (list(HEAVY_STAGES) if heavy else [])
         want = {s.strip() for s in only.split(",") if s.strip()}
-        stages = [s for s in DEFAULT_STAGES if s.name in want]
+        stages = [s for s in ALL_STAGES.values() if s.name in want]
         if not stages:
             print(f"unknown stages: {only} (есть: "
-                  + ",".join(s.name for s in DEFAULT_STAGES) + ")")
+                  + ",".join(ALL_STAGES) + ")")
             raise SystemExit(2)
         return stages
 

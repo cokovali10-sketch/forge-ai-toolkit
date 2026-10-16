@@ -121,7 +121,7 @@ def test_mcp_pipe_tools(tmp_path):
     names = sorted(reg.tool_owner)
     assert "pipe.stages" in names and "pipe.run" in names and "pipe.status" in names
     lst = reg.call("pipe.stages", {})
-    assert [s["name"] for s in lst["data"]["stages"]] == ["inspect", "review", "skills", "knowledge"]
+    assert [s["name"] for s in lst["data"]["stages"]] == ["inspect", "review", "skills", "knowledge", "lab-e2e"]
     rep = reg.call("pipe.run", {"root": str(tmp_path), "only": "inspect"})
     assert rep["data"]["status"] == "SUCCESS"
     assert [s["name"] for s in rep["data"]["stages"]] == ["inspect"]
@@ -209,3 +209,21 @@ def test_incremental_ext_filter(tmp_path):
     (tmp_path / "pic.png").write_bytes(b"\x89PNG")
     r = mk().run()  # .png вне фильтра — кэш жив
     assert calls == [1] and r.stages[0].get("cached") is True
+
+
+def test_heavy_stage_listed_and_gated(tmp_path):
+    from forge.mcp.server import build_default_registry
+    from forge.pipe.stages import HEAVY_STAGES, stage_lab_e2e
+    assert [s.name for s in HEAVY_STAGES] == ["lab-e2e"]
+    assert HEAVY_STAGES[0].timeout_s >= 900
+    reg = build_default_registry("")
+    names = [s["name"] for s in
+             reg.call("pipe.stages", {})["data"]["stages"]]
+    assert "lab-e2e" in names
+    heavy = [s for s in reg.call("pipe.stages", {})["data"]["stages"]
+             if s["name"] == "lab-e2e"][0]
+    assert heavy["heavy"] is True
+    # без окружения (чужой forge_root) — быстрый честный ERROR, не вис
+    res = stage_lab_e2e({"target": str(tmp_path),
+                         "forge_root": str(tmp_path)})
+    assert res.status == "ERROR" and "env not ready" in str(res.error)

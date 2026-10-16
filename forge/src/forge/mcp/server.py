@@ -169,24 +169,28 @@ def _wire_pipe(reg, local) -> None:
     """Conveyor as MCP tools: any external agent can trigger the pipe."""
     from ..core.registry import ToolDef
     from ..pipe.runner import PipeRunner
-    from ..pipe.stages import DEFAULT_STAGES
+    from ..pipe.stages import ALL_STAGES, DEFAULT_STAGES, HEAVY_STAGES
     from pathlib import Path as _P
+    _heavy_names = {s.name for s in HEAVY_STAGES}
+    _all = list(DEFAULT_STAGES) + list(HEAVY_STAGES)
 
-    def _selected(only: str) -> list:
-        if not only:
-            return DEFAULT_STAGES
-        want = {s.strip() for s in only.split(",") if s.strip()}
-        return [s for s in DEFAULT_STAGES if s.name in want]
+    def _selected(only: str, heavy: bool) -> list:
+        if only:
+            want = {s.strip() for s in only.split(",") if s.strip()}
+            return [s for s in _all if s.name in want]
+        return list(DEFAULT_STAGES) + (list(HEAVY_STAGES) if heavy else [])
 
     local.add(ToolDef("pipe.stages", "List conveyor stages", level=0),
               lambda p: {"stages": [
                   {"name": s.name, "title": s.title,
                    "timeout_s": s.timeout_s, "allow_fail": s.allow_fail,
-                   "notes": s.notes} for s in DEFAULT_STAGES]})
+                   "heavy": s.name in _heavy_names,
+                   "notes": s.notes} for s in _all]})
     local.add(ToolDef("pipe.run", "Run conveyor headless, returns report",
-                      level=2, timeout=900),
+                      level=2, timeout=1800),
               lambda p: PipeRunner(
-                  _selected(str(p.get("only", "") or "")),
+                  _selected(str(p.get("only", "") or ""),
+                            bool(p.get("heavy", False))),
                   {"target": p.get("root", "."),
                    "forge_root": str(_P(__file__).resolve().parents[3])},
                   checkpoint=str(_P(str(p.get("root", "."))) /
