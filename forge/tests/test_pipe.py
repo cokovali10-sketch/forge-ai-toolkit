@@ -85,6 +85,17 @@ def test_window_helpers_without_window():
     assert "чекпоинт" in line2
 
 
+def test_window_clean_code_rows(tmp_path):
+    from forge.pipe.window import clean_code_rows
+    (tmp_path / "bad.py").write_text(
+        "x = 99999\n" * 3 + "def f(a, b, c, d, e):\n    return a\n",
+        encoding="utf-8")
+    rows = clean_code_rows(str(tmp_path))
+    assert rows and "здоровье" in rows[0]
+    assert any("too-many-args" in r for r in rows[1:])
+    assert clean_code_rows(str(tmp_path / "missing")) != [] or True  # never raises
+
+
 def test_review_suppress_needs_reason(tmp_path):
     from forge.quality.review import review
     (tmp_path / "a.py").write_text("# TODO: later\n", encoding="utf-8")

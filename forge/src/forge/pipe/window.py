@@ -58,6 +58,20 @@ def load_history_rows(target: str, limit: int = 50) -> list[str]:
     return rows
 
 
+def clean_code_rows(target: str, limit: int = 100) -> list[str]:
+    """Pure helper: строки плана чистого кода (без окна, тестируется)."""
+    try:
+        from forge.refactor.api import plan
+        p = plan(target)
+    except Exception:  # noqa: BLE001 - окно не должно падать
+        return []
+    rows = [f"здоровье {p.get('score', 100)}/100 · шагов {p.get('total', 0)}"]
+    for s in p.get("steps", [])[:limit]:
+        rows.append(f"[{s['severity']}/{s['effort']}] {s['kind']} "
+                    f"{s['file']}:{s['line']}")
+    return rows
+
+
 class PipeWindow:
     def __init__(self, target: str, forge_root: str, resume: bool = False):
         from forge.pipe.runner import PipeRunner
@@ -111,7 +125,9 @@ class PipeWindow:
         nb.pack(fill="both", expand=True)
         tab_pipe = ttk.Frame(nb, padding=2)
         tab_hist = ttk.Frame(nb, padding=8)
+        tab_clean = ttk.Frame(nb, padding=8)
         nb.add(tab_pipe, text="Конвейер")
+        nb.add(tab_clean, text="Чистый код")
         nb.add(tab_hist, text="История")
         self.nb = nb
         mid = ttk.Frame(tab_pipe, padding=8)
@@ -154,6 +170,16 @@ class PipeWindow:
         hrow.pack(fill="x", pady=(8, 0))
         ttk.Button(hrow, text="↻ Обновить", command=self._refresh_history).pack(side="left")
         nb.bind("<<NotebookTabChanged>>", lambda _e: self._refresh_history())
+        # вкладка чистого кода (советник refactor)
+        self.cc = tk.Listbox(tab_clean, font=("Consolas", 10),
+                             bg="#101016", fg=fg,
+                             highlightthickness=0, borderwidth=0)
+        self.cc.pack(fill="both", expand=True)
+        crow = ttk.Frame(tab_clean)
+        crow.pack(fill="x", pady=(8, 0))
+        ttk.Button(crow, text="🔍 Проверить",
+                   command=self._refresh_clean_code).pack(side="left")
+        self.cc.insert("end", "нажми «Проверить» — покажу здоровье и план рефакторинга")
         self._preload()
         self._refresh_stages()
         self._refresh_cont()
@@ -187,6 +213,30 @@ class PipeWindow:
             return
         for r in rows:
             self.hist.insert("end", r)
+
+    def _refresh_clean_code(self) -> None:
+        """Считает план чистого кода в фоне, чтобы окно не подвисало."""
+        if not hasattr(self, "cc"):
+            return
+        self.cc.delete(0, "end")
+        self.cc.insert("end", "считаю…")
+
+        def work() -> None:
+            rows = clean_code_rows(self.target)
+            if self.root.winfo_exists():
+                self.root.after(0, lambda: self._fill_clean_code(rows))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _fill_clean_code(self, rows: list[str]) -> None:
+        if not hasattr(self, "cc") or not self.cc.winfo_exists():
+            return
+        self.cc.delete(0, "end")
+        if not rows:
+            self.cc.insert("end", "(не удалось посчитать)")
+            return
+        for r in rows:
+            self.cc.insert("end", r)
 
     def _refresh_stages(self) -> None:
         self.stages.delete(0, "end")
