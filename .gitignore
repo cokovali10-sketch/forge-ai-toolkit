@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# FORGE generated / lab
+lab-runs/
+lab-servers/
+*.forgebak
+.forge-pipe-checkpoint.json
+.forge-pipe-history.jsonl
+forge-pipe-report.json
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
