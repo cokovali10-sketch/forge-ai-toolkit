@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- serve: `forge serve [dir] [--port] [--open] [--watch]` — a single local
+  read-only dashboard (health, quality trend, deps, secrets, pipe history,
+  arena, environment) + JSON API (`/api/report`, `/api/health`); stdlib only
+- kit: `forge report [dir]` and MCP `report.full` — one consolidated report
+  (audit + quality trend + pipe history + arena + environment) shared by the
+  CLI, the MCP server and the dashboard
 - kit: `forge init [dir]` (`init.project`) — onboards a project in one command:
   writes the missing CI workflow and `.forge-suppress.json`, prints next steps;
   never overwrites without `--force`

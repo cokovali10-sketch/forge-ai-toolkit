@@ -145,6 +145,8 @@ builds and writes — 2. The client decides what the agent may do.
 | `forge doctor [dir]` | audit toolchains/versions and FORGE capabilities here |
 | `forge audit <dir>` | one-shot project health (map/secrets/deps/quality) |
 | `forge init [dir]` | onboard a project: CI + suppress stub, no overwrite |
+| `forge report [dir]` | one consolidated report: audit + trend + pipe + env |
+| `forge serve [dir]` | local dashboard + JSON API for the project |
 | `forge refactor <file\|dir>` | clean-code advisor: long functions, nesting, duplicates, magic numbers |
 | `forge do "<intent>"` | orchestrator: generator, modules, skills, knowledge, plan, verify |
 | `forge loop <dir>` | closed loop: conveyor → repair bundles → safe fixes → retry |
@@ -248,7 +250,24 @@ forge init .                      :: connect the project to FORGE
 ```
 
 For agents: `map.project`, `test.detect`, `test.run`, `ci.generate`,
-`secrets.scan`, `deps.scan`, `doctor.check`, `audit.run`, `init.project`.
+`secrets.scan`, `deps.scan`, `doctor.check`, `audit.run`, `init.project`,
+`report.full`.
+
+## The single dashboard: `forge serve`
+
+One screen for **any** project: health (audit), quality trend, dependencies,
+secrets, conveyor history, arena scoreboard, environment — plus the same report
+as a JSON API for agents and webhooks. Stdlib only, localhost only, read-only.
+
+```bat
+forge report .            :: the summary in the terminal (what the dashboard sees)
+forge report . --json     :: the same summary, machine-readable
+forge serve . --open      :: open the dashboard in a browser (port 8099)
+forge serve . --watch 30  :: rebuild the report in the background every 30s
+```
+
+API: `GET /api/report[?deep=1]` — the full report; `GET /api/health` — score
+and verdict. Agents get it in one call via `report.full`.
 
 ## The `pipe` conveyor in detail
 
@@ -285,7 +304,7 @@ reason (`.forge-suppress.json`), line-level via `# forge-ignore`.
 Now: core, conveyor (8 stages), lab, 5 languages, editor, generators (`web`,
 `python-service`, `go-cli`, `node-api`, `rust-cli`, `paper`) + `make`, the
 `map`/`test`/`ci`/`secrets`/`deps`/`doctor` arsenal, the `refactor` advisor, the
-`do`/`loop`/`quality` autopilot, a first arena entry (reference 3/3), 179 green
+`do`/`loop`/`quality` autopilot, a first arena entry (reference 3/3), 182 green
 tests.
 Honestly not done: desktop app (needs Rust for Tauri - no cargo on this machine),
 GUI screenshots, auto-client — marked `NOT_IMPLEMENTED`.

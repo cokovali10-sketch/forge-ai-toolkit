@@ -164,7 +164,7 @@ def test_cli_and_mcp_wired(tmp_path):
     reg = build_default_registry("")
     for tool in ("map.project", "test.detect", "test.run", "ci.generate",
                  "secrets.scan", "doctor.check", "deps.scan", "audit.run",
-                 "init.project"):
+                 "init.project", "report.full"):
         assert tool in reg.tool_owner, tool
     r = reg.call("map.project", {"root": str(tmp_path)})
     assert r["ok"] is True

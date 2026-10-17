@@ -791,6 +791,37 @@ def _init(args: list[str]) -> int:
     return 0
 
 
+def _report(args: list[str]) -> int:
+    """forge report [dir] [--deep] [--json]: единый свод (audit+тренд+...)."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.kit import full_report, render_report
+    if args and args[0] in ("-h", "--help", "help"):
+        print("usage: forge report [dir] [--deep] [--json]")
+        return 0
+    pos = _positionals(args)
+    rep = full_report(pos[0] if pos else ".", deep="--deep" in args)
+    if "--json" in args:
+        print(_json.dumps(rep, ensure_ascii=False, indent=2))
+        return 0 if rep.get("ok") else 1
+    print(render_report(rep))
+    return 0 if rep.get("ok") else 1
+
+
+def _serve(args: list[str]) -> int:
+    """forge serve [dir] [--port N] [--open] [--watch S]: дашборд + API."""
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.serve import serve
+    if args and args[0] in ("-h", "--help", "help"):
+        print("usage: forge serve [dir] [--port 8099] [--open] [--watch 30]")
+        return 0
+    pos = _positionals(args)
+    root = pos[0] if pos else "."
+    port = int(_flag(args, "--port") or 8099)
+    watch = float(_flag(args, "--watch") or 0)
+    return serve(root, port=port, open_browser="--open" in args, watch=watch)
+
+
 def _evolve(args: list[str]) -> int:
     """forge evolve [dir] [--json]: что протухло и кому чинить."""
     import json as _json
@@ -1266,6 +1297,10 @@ def main(argv: list[str] | None = None) -> int:
         return _audit(args[1:])
     if cmd == "init":
         return _init(args[1:])
+    if cmd == "report":
+        return _report(args[1:])
+    if cmd == "serve":
+        return _serve(args[1:])
     if cmd == "docs":
         return _docs(args[1:])
     if cmd == "bench":

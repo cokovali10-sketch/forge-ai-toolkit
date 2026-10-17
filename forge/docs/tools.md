@@ -1,6 +1,6 @@
 # Tool Catalog (generated — do not edit by hand)
 
-SOURCE_OF_TRUTH = registry (56 tools)
+SOURCE_OF_TRUTH = registry (57 tools)
 
 ## audit.run
 - module: kit, backend: local, level: 1
@@ -201,6 +201,10 @@ SOURCE_OF_TRUTH = registry (56 tools)
 ## refactor.sarif
 - module: refactor, backend: local, level: 0
 - Clean-code findings as SARIF 2.1.0
+
+## report.full
+- module: kit, backend: local, level: 1
+- One consolidated report: audit+quality trend+pipe+arena
 
 ## secrets.scan
 - module: kit, backend: local, level: 0
