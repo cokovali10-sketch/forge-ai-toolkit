@@ -22,6 +22,9 @@ GENERATORS: dict[str, list[str]] = {
                        "бэкенд", "backend"],
     "go-cli": ["cli", "утилита", "утилит", "инструмент командной",
                "tool", "command-line"],
+    "node-api": ["node", "node.js", "nodejs", "javascript api", "нода",
+                 "express", "js api"],
+    "rust-cli": ["rust", "cargo", "крейт", "rust-cli"],
     "paper": ["плагин", "plugin", "paper", "minecraft", "майнкрафт", "spigot",
               "bukkit"],
 }

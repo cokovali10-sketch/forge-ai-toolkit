@@ -135,8 +135,12 @@ builds and writes — 2. The client decides what the agent may do.
 | `forge lang detect/lint/test/scaffold` | 5 language experts (python/js/rust/cpp/go) |
 | `forge edit inspect/get/set/validate/rollback` | object editor (native JSON, YAML via Anvil) |
 | `forge evolve` | what is stale and who should fix it |
-| `forge gen web/python-service/go-cli/paper` | project generators (landing, microservice, Go CLI, Paper plugin) |
+| `forge gen web/python-service/go-cli/node-api/rust-cli/paper` | project generators (landing, microservice, Go/Node/Rust, Paper plugin) |
 | `forge make <kind> <name> [out]` | generator + conveyor check in one shot |
+| `forge map <dir>` | project map: languages and LOC, entry points, import graph, deps |
+| `forge test <dir>` | universal test runner (pytest/npm/go/cargo/gradle/maven/make) |
+| `forge ci <dir>` | generate a GitHub Actions workflow for the detected stack |
+| `forge secrets <dir>` | secret-leak scan (keys/tokens/passwords, masked output) |
 | `forge refactor <file\|dir>` | clean-code advisor: long functions, nesting, duplicates, magic numbers |
 | `forge do "<intent>"` | orchestrator: generator, modules, skills, knowledge, plan, verify |
 | `forge loop <dir>` | closed loop: conveyor → repair bundles → safe fixes → retry |
@@ -195,6 +199,35 @@ forge quality . --min-score 80 --max-regression 2
 
 For agents: `do.plan`, `do.run`, `loop.run`, `quality.report`.
 
+## The `kit` arsenal: `map`, `test`, `ci`, `secrets`
+
+Four commands that turn FORGE into a cannon for any project.
+
+- `forge map <dir>` - instant map of unfamiliar code: languages and lines of
+  code, build files, guessed entry points, largest files, the internal Python
+  import graph, and external dependencies. Read-only, runs nothing. `--json`
+  for agents.
+- `forge test <dir>` - detects the stack (pytest / npm / go / cargo / gradle /
+  maven / make) and runs the project's **native** tests. A missing toolchain is
+  not a failure - it is an honest "skipped". `--detect` prints the chosen
+  command.
+- `forge ci <dir>` - reads build files and generates
+  `.github/workflows/forge-ci.yml` with a job per ecosystem. Won't overwrite
+  without `--force`.
+- `forge secrets <dir>` - finds keys, tokens, private keys and passwords
+  (AWS/GitHub/Google/Slack/Stripe/OpenAI, JWT, `password=...`). The full secret
+  **never** reaches the output - only a mask. Catch a leak before you publish.
+
+```bat
+forge map .                       :: project map
+forge test . --timeout 300        :: run the project's tests
+forge ci .                        :: generate CI
+forge secrets .                   :: check for leaks
+```
+
+For agents: `map.project`, `test.detect`, `test.run`, `ci.generate`,
+`secrets.scan`.
+
 ## The `pipe` conveyor in detail
 
 7 stages: inspect → review → skills → knowledge → langs → clean-code →
@@ -225,11 +258,13 @@ reason (`.forge-suppress.json`), line-level via `# forge-ignore`.
 
 ## Status and roadmap
 
-Now: core, conveyor, lab, 5 languages, editor, generators + `make`, the
-`refactor` advisor, the `do`/`loop`/`quality` autopilot, 148 green tests.
+Now: core, conveyor, lab, 5 languages, editor, generators (`web`,
+`python-service`, `go-cli`, `node-api`, `rust-cli`, `paper`) + `make`, the
+`map`/`test`/`ci`/`secrets` arsenal, the `refactor` advisor, the
+`do`/`loop`/`quality` autopilot, 161 green tests.
 Honestly not done: desktop app (needs Node for Tauri), GUI screenshots,
 auto-client — marked `NOT_IMPLEMENTED`.
-Next: project generators (web/Python/Go), first arena entry, PyPI release.
+Next: first arena entry, PyPI release.
 
 ## License
 

@@ -11,9 +11,12 @@ from typing import Any
 
 def make(kind: str, name: str, out: str | Path, forge_root: str | Path) -> dict[str, Any]:
     from forge.gen import go_cli as _g
+    from forge.gen import node_api as _n
     from forge.gen import python_service as _p
+    from forge.gen import rust_cli as _r
     from forge.gen import web as _w
-    mods = {"web": _w, "python-service": _p, "go-cli": _g}
+    mods = {"web": _w, "python-service": _p, "go-cli": _g,
+            "node-api": _n, "rust-cli": _r}
     if kind not in mods:
         return {"ok": False, "error": f"unknown kind (есть: {','.join(mods)})"}
     dest = Path(out) / name if Path(out).name != name else Path(out)

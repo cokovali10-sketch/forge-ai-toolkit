@@ -1,6 +1,20 @@
 # Changelog
 
 ## Unreleased
+- kit: new `forge/kit` arsenal, four commands (CLI + MCP):
+  - `map` (`map.project`) — project map: languages and LOC, build files,
+    entry points, largest files, internal Python import graph, dependencies
+  - `test` (`test.detect` / `test.run`) — universal runner for
+    pytest/npm/go/cargo/gradle/maven/make; a missing toolchain is "skipped",
+    not a failure
+  - `ci` (`ci.generate`) — writes `.github/workflows/forge-ci.yml` with a job
+    per ecosystem; won't overwrite without `--force`
+  - `secrets` (`secrets.scan`) — leaks of AWS/GitHub/Google/Slack/Stripe/OpenAI
+    keys, JWTs, private keys and `password=` assignments; output is masked
+    (the full secret never appears)
+- gen: two new generators — `node-api` (zero-dependency Node HTTP API with
+  `node --test` tests) and `rust-cli` (zero-dependency Cargo CLI with unit
+  tests); both wired into `make`, CLI `gen`, MCP and the `do` router
 - refactor: new safe auto-fix — PEP8 comparisons (`== None`/`!= True` …) are
   rewritten to `is` / `is not`; detected as `simplifiable-comparison`,
   applied via `--apply` or `--only comparisons`

@@ -84,16 +84,19 @@ def _gen(args: list[str]) -> int:
     sys.path.insert(0, str(ROOT / "src"))
     if not args or args[0] in ("-h", "--help", "help"):
         print("usage: forge gen paper --name X [--package P] [--command C] [--out DIR]")
-        print("       forge gen web|python-service|go-cli --name X --out DIR")
+        print("       forge gen web|python-service|go-cli|node-api|rust-cli "
+              "--name X --out DIR")
         return 0
-    if args[0] in ("web", "python-service", "go-cli"):
+    if args[0] in ("web", "python-service", "go-cli", "node-api", "rust-cli"):
         import json as _json
         o = _kv(args[1:])
         if not o.get("out"):
             print(f"usage: forge gen {args[0]} --name X --out DIR")
             return 2
-        from forge.gen import go_cli as _g, python_service as _p, web as _w
-        mod = {"web": _w, "python-service": _p, "go-cli": _g}[args[0]]
+        from forge.gen import go_cli as _g, node_api as _n, python_service as _p
+        from forge.gen import rust_cli as _r, web as _w
+        mod = {"web": _w, "python-service": _p, "go-cli": _g,
+               "node-api": _n, "rust-cli": _r}[args[0]]
         try:
             res = mod.generate(o["out"], o.get("name", "demo"))
         except (ValueError, OSError) as e:
@@ -577,6 +580,116 @@ def _flag(args: list[str], name: str) -> str:
     return ""
 
 
+_VALUE_FLAGS = {"--timeout", "--max-files", "--min-score", "--max-regression"}
+
+
+def _positionals(args: list[str]) -> list[str]:
+    """Позиционные аргументы без флагов и их значений (напр. `--timeout 600`)."""
+    out: list[str] = []
+    skip = False
+    for a in args:
+        if skip:
+            skip = False
+            continue
+        if a in _VALUE_FLAGS:
+            skip = True
+            continue
+        if a.startswith("--"):
+            continue
+        out.append(a)
+    return out
+
+
+def _map(args: list[str]) -> int:
+    """forge map <dir> [--json]: карта проекта (языки, LOC, вход, импорты)."""
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.kit import build_map, render_text
+    if not args or args[0] in ("-h", "--help", "help"):
+        print("usage: forge map <dir> [--json]")
+        print("  карта проекта: языки и LOC, файлы сборки, точки входа,")
+        print("  крупнейшие файлы, граф внутренних импортов и внешние зависимости")
+        return 0
+    m = build_map(_positionals(args)[0] if _positionals(args) else ".")
+    if "--json" in args:
+        import json as _json
+        print(_json.dumps(m, ensure_ascii=False, indent=2))
+    else:
+        print(render_text(m))
+    return 0 if m.get("ok") else 1
+
+
+def _test(args: list[str]) -> int:
+    """forge test <dir> [--detect] [--timeout S] [--json]: тесты проекта."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.kit import detect_test_command, run_tests
+    if not args or args[0] in ("-h", "--help", "help"):
+        print("usage: forge test <dir> [--detect] [--timeout S] [--json]")
+        print("  сам определяет стек (pytest/npm/go/cargo/gradle/maven/make)")
+        print("  и запускает родные тесты; нет тулчейна — это не провал")
+        return 0
+    root = _positionals(args)[0] if _positionals(args) else "."
+    if "--detect" in args:
+        print(_json.dumps(detect_test_command(root), ensure_ascii=False))
+        return 0
+    tmo = int(_flag(args, "--timeout")) if _flag(args, "--timeout") else 600
+    out = run_tests(root, timeout=tmo)
+    if "--json" in args:
+        print(_json.dumps(out, ensure_ascii=False, indent=2))
+        return 0 if out.get("ok") else 1
+    if not out.get("ran"):
+        print(f"тесты: пропущено ({out.get('reason', '')})")
+        return 0
+    mark = "OK" if out["ok"] else "FAIL"
+    print(f"тесты ({out['kind']}): {mark}"
+          + (f" — {out['summary']}" if out.get("summary") else ""))
+    if not out["ok"]:
+        print(out.get("log_tail", "")[-800:])
+    return 0 if out["ok"] else 1
+
+
+def _ci(args: list[str]) -> int:
+    """forge ci <dir> [--force] [--json]: сгенерировать workflow GitHub Actions."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.kit import generate_ci
+    if not args or args[0] in ("-h", "--help", "help"):
+        print("usage: forge ci <dir> [--force] [--json]")
+        print("  пишет .github/workflows/forge-ci.yml под стек проекта")
+        return 0
+    out = generate_ci(_positionals(args)[0] if _positionals(args) else ".",
+                      force="--force" in args)
+    if "--json" in args:
+        print(_json.dumps(out, ensure_ascii=False, indent=2))
+    elif out.get("ok"):
+        print(f"workflow: {out['path']} (экосистемы: {', '.join(out['ecosystems'])})")
+    else:
+        print(f"ci: {out.get('error')}")
+    return 0 if out.get("ok") else 1
+
+
+def _secrets(args: list[str]) -> int:
+    """forge secrets <dir> [--json]: скан утечек секретов."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.kit import scan_secrets
+    if not args or args[0] in ("-h", "--help", "help"):
+        print("usage: forge secrets <dir> [--json]")
+        print("  ищет ключи/токены/приватные ключи/пароли (вывод маскируется)")
+        return 0
+    out = scan_secrets(_positionals(args)[0] if _positionals(args) else ".")
+    if "--json" in args:
+        print(_json.dumps(out, ensure_ascii=False, indent=2))
+    elif out.get("ok"):
+        print(f"секреты: найдено {out['count']} "
+              f"(просканировано файлов {out['files_scanned']})")
+        for f in out["findings"][:20]:
+            print(f"  [{f['severity']}] {f['kind']} — {f['file']} ({f['preview']})")
+    else:
+        print(f"secrets: {out.get('error')}")
+    return 0 if out.get("ok") else 1
+
+
 def _evolve(args: list[str]) -> int:
     """forge evolve [dir] [--json]: что протухло и кому чинить."""
     import json as _json
@@ -1036,6 +1149,14 @@ def main(argv: list[str] | None = None) -> int:
         return _do(args[1:])
     if cmd == "quality":
         return _quality(args[1:])
+    if cmd == "map":
+        return _map(args[1:])
+    if cmd == "test":
+        return _test(args[1:])
+    if cmd == "ci":
+        return _ci(args[1:])
+    if cmd == "secrets":
+        return _secrets(args[1:])
     if cmd == "docs":
         return _docs(args[1:])
     if cmd == "bench":

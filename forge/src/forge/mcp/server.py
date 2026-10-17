@@ -117,6 +117,7 @@ def build_default_registry(anvil_dir: str = "") -> Registry:
     _wire_pipe(reg, local)
     _wire_loop(reg, local)
     _wire_quality(reg, local)
+    _wire_kit(reg, local)
     _wire_more(reg, local, anvil_dir)
     if anvil_dir and Path(anvil_dir, "anvil_call.py").is_file():
         reg.add_backend("anvil", AnvilBackend(anvil_dir))
@@ -232,11 +233,13 @@ def _wire_refactor(reg, local) -> None:
 
 
 def _wire_gen(reg, local) -> None:
-    """Project generators: web landing, python service, go cli, paper plugin."""
+    """Project generators: web, python service, go cli, node api, rust cli, paper."""
     from ..core.registry import ToolDef
     from ..gen import go_cli as _g
+    from ..gen import node_api as _n
     from ..gen import paper_plugin as _pp
     from ..gen import python_service as _ps
+    from ..gen import rust_cli as _r
     from ..gen import web as _w
     local.add(ToolDef("gen.web", "Scaffold landing page", level=1),
               lambda p: _w.generate(str(p.get("out", ".")),
@@ -248,6 +251,14 @@ def _wire_gen(reg, local) -> None:
     local.add(ToolDef("gen.go_cli", "Scaffold Go CLI tool", level=1),
               lambda p: _g.generate(str(p.get("out", ".")),
                                     str(p.get("name", "cli"))))
+    local.add(ToolDef("gen.node_api", "Scaffold Node HTTP API (zero deps)",
+                      level=1),
+              lambda p: _n.generate(str(p.get("out", ".")),
+                                    str(p.get("name", "api"))))
+    local.add(ToolDef("gen.rust_cli", "Scaffold Rust CLI tool (zero deps)",
+                      level=1),
+              lambda p: _r.generate(str(p.get("out", ".")),
+                                    str(p.get("name", "cli"))))
     local.add(ToolDef("gen.paper", "Scaffold Paper plugin", level=1),
               lambda p: _pp.generate(
                   str(p.get("out", ".")), str(p.get("name", "Demo")),
@@ -255,7 +266,8 @@ def _wire_gen(reg, local) -> None:
                   str(p.get("command", "hello"))))
     reg.add_module(ModuleDef("gen", "Project generators", "0.1.0",
                              ["gen.web", "gen.python_service",
-                              "gen.go_cli", "gen.paper"]))
+                              "gen.go_cli", "gen.node_api", "gen.rust_cli",
+                              "gen.paper"]))
     local.add(ToolDef("make.project", "Scaffold + verify project", level=2),
               lambda p: _make_project(p))
     reg.add_module(ModuleDef("make", "Project stamping", "0.1.0",
@@ -307,6 +319,33 @@ def _wire_quality(reg, local) -> None:
                                  run_pipe=bool(p.get("pipe")), save=False))
     reg.add_module(ModuleDef("quality", "Quality dashboard", "0.1.0",
                              ["quality.report"]))
+
+
+def _wire_kit(reg, local) -> None:
+    """Project cannon: map / test / ci / secrets."""
+    from ..core.registry import ModuleDef, ToolDef
+    from .. import kit as _kit
+    local.add(ToolDef("map.project",
+                      "Project map: languages, LOC, entries, imports", level=0),
+              lambda p: _kit.build_map(str(p.get("root", ".")),
+                                       max_files=int(p.get("max_files", 20000))))
+    local.add(ToolDef("test.detect", "Detect the project's native test command",
+                      level=0),
+              lambda p: {"detected": _kit.detect_test_command(str(p.get("root", ".")))})
+    local.add(ToolDef("test.run", "Run the project's native test suite", level=1),
+              lambda p: _kit.run_tests(str(p.get("root", ".")),
+                                       timeout=int(p.get("timeout", 600))))
+    local.add(ToolDef("ci.generate",
+                      "Generate a GitHub Actions workflow for the project stack",
+                      level=1),
+              lambda p: _kit.generate_ci(str(p.get("root", ".")),
+                                         force=bool(p.get("force"))))
+    local.add(ToolDef("secrets.scan",
+                      "Scan for leaked secrets (masked output)", level=0),
+              lambda p: _kit.scan_secrets(str(p.get("root", "."))))
+    reg.add_module(ModuleDef("kit", "Project cannon: map/test/ci/secrets", "0.1.0",
+                             ["map.project", "test.detect", "test.run",
+                              "ci.generate", "secrets.scan"]))
 
 
 def _wire_ui(reg, local) -> None:
