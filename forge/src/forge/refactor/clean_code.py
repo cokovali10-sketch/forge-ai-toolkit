@@ -247,11 +247,24 @@ def _duplicate_blocks(lines: list[str]) -> list[Issue]:
     return issues
 
 
+DEFAULT_CODE_EXTS = (".py", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
+                     ".go", ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".h",
+                     ".java", ".kt", ".rs")
+
+
 def analyze_file(path: str | Path) -> dict[str, Any]:
-    """Анализирует один Python-файл и возвращает список проблем."""
+    """Анализирует один файл. Python — через AST, остальные — эвристикой."""
     p = Path(path)
     if not p.is_file():
         return {"file": str(p), "ok": False, "error": f"файл не найден: {p}"}
+    if p.suffix.lower() == ".py":
+        return _analyze_python(p)
+    from forge.refactor.generic import analyze_generic
+    return analyze_generic(p)
+
+
+def _analyze_python(p: Path) -> dict[str, Any]:
+    """Анализ Python-файла через AST."""
     try:
         text = p.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as e:
@@ -288,7 +301,8 @@ def analyze_file(path: str | Path) -> dict[str, Any]:
     }
 
 
-def analyze_dir(root: str | Path, exts: tuple[str, ...] = (".py",)) -> dict[str, Any]:
+def analyze_dir(root: str | Path,
+                exts: tuple[str, ...] = DEFAULT_CODE_EXTS) -> dict[str, Any]:
     """Рекурсивно анализирует директорию."""
     base = Path(root)
     results: list[dict[str, Any]] = []

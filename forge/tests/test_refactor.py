@@ -120,6 +120,42 @@ def test_plan_and_sarif(tmp_path):
     assert sp.is_file()
 
 
+def test_generic_js_long_function(tmp_path):
+    from forge.refactor.clean_code import analyze_file
+    body = "\n".join(f"  const v{i} = {i + 100};" for i in range(55))
+    src = f"function big(a, b, c, d, e) {{\n{body}\n  return v0;\n}}\n"
+    p = tmp_path / "s.js"
+    p.write_text(src, encoding="utf-8")
+    res = analyze_file(p)
+    assert res["ok"] is True and res["lang"] == "generic"
+    kinds = {i["kind"] for i in res["issues"]}
+    assert "long-function" in kinds
+    assert "too-many-args" in kinds
+
+
+def test_generic_go_duplicate_and_magic(tmp_path):
+    from forge.refactor.clean_code import analyze_file
+    block = ("    total = total + value\n"
+             "    count = count + 1\n"
+             "    logger.Trace(total)\n")
+    src = "func run(a int) {\n" + block + block + "    return 8080\n}\n"
+    p = tmp_path / "s.go"
+    p.write_text(src, encoding="utf-8")
+    res = analyze_file(p)
+    kinds = {i["kind"] for i in res["issues"]}
+    assert "duplicate-block" in kinds
+    assert "magic-number" in kinds
+
+
+def test_generic_no_false_magic_in_strings_and_comments(tmp_path):
+    from forge.refactor.clean_code import analyze_file
+    p = tmp_path / "c.js"
+    p.write_text('const s = "12345"; // 99999\n/* 77777 */\nconst n = 5;\n',
+                 encoding="utf-8")
+    res = analyze_file(p)
+    assert res["total"] == 0
+
+
 def test_pipe_clean_code_stage(tmp_path):
     from forge.pipe.runner import PipeRunner
     from forge.pipe.stages import DEFAULT_STAGES
