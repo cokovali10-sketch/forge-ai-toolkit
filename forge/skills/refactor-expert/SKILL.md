@@ -23,8 +23,16 @@ fewer lines with the same meaning — not fewer features.
 
 ## Measure first
 - `forge refactor <file|dir>` → list of issues: `long-function`,
-  `deep-nesting`, `duplicate-block`, `magic-number`, `too-many-args`, `god-class`.
-- Work by severity: high → medium → low. One issue, one small commit.
+  `deep-nesting`, `duplicate-block`, `magic-number`, `too-many-args`, `god-class`,
+  `high-complexity` + a **health score 0..100**. Python via AST, other
+  languages (JS/TS/Go/C++/Java/Rust) via a brace-based heuristic.
+- `forge refactor <dir> --plan` → prioritized steps (severity first, cheap
+  effort first). Work them top-down, one issue, one small commit.
+- `forge refactor <dir> --sarif out.sarif` → feed GitHub code scanning.
+- `forge refactor <file.py> --apply --test "pytest -q"` → FORGE extracts
+  repeated magic numbers into constants with a backup, a syntax check, your
+  tests, and **automatic rollback** if anything fails. Then rename the
+  auto-generated `CONST_*` names to meaningful ones yourself.
 
 ## The safe recipe (behavior-preserving)
 1. **Tests first.** If none cover the target, write one green test that captures

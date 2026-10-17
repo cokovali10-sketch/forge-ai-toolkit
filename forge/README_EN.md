@@ -149,7 +149,19 @@ functions (>50 lines), deep nesting (>3), duplicated blocks (3+ lines), magic
 numbers, functions with too many args, God-classes (>200 lines), high
 cyclomatic complexity (>10) — and gives a concrete "extract / guard-clause /
 named constant" suggestion for each, plus a **health score 0..100**. It only
-recommends structure, never changes behavior. For agents: `refactor.inspect`.
+recommends structure, never changes behavior. Python is parsed via AST;
+JS/TS, Go, C++, Java, Kotlin and Rust via a brace-based heuristic.
+
+```bat
+forge refactor src --plan                  :: prioritized: what to fix first
+forge refactor src --sarif out.sarif       :: GitHub code scanning
+forge refactor app.py --apply --test "pytest -q"
+```
+
+`--apply` extracts repeated magic numbers into named constants with a backup,
+a syntax check, your tests, and **automatic rollback** if anything fails.
+For agents: `refactor.inspect`, `refactor.plan`, `refactor.sarif`,
+`refactor.apply`. Skill: `refactor-expert`.
 
 ## The `pipe` conveyor in detail
 
