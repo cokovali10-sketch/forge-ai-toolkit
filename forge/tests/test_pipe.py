@@ -607,11 +607,11 @@ def test_evolve_detects_staleness(tmp_path):
 
 def test_secrets_stage_high_fails_medium_warns(tmp_path):
     from forge.pipe.stages import stage_secrets
-    (tmp_path / "k.py").write_text('x = "AKIAABCDEFGHIJKLMNOP"\n',
+    (tmp_path / "k.py").write_text('x = "AKIAABCDEFGHIJKLMNOP"\n',  # forge:allow-secret
                                    encoding="utf-8")
     r = stage_secrets({"target": str(tmp_path)})
     assert r.status == "FAILED" and r.result["count"] == 1
-    (tmp_path / "k.py").write_text('password = "hunter2secret"\n',
+    (tmp_path / "k.py").write_text('password = "hunter2secret"\n',  # forge:allow-secret
                                    encoding="utf-8")
     r2 = stage_secrets({"target": str(tmp_path)})
     assert r2.status == "SUCCESS" and r2.warnings

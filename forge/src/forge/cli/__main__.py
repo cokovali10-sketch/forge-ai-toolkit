@@ -690,6 +690,34 @@ def _secrets(args: list[str]) -> int:
     return 0 if out.get("ok") else 1
 
 
+def _audit(args: list[str]) -> int:
+    """forge audit <dir> [--deep] [--json] [--min-score N]: здоровье проекта."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.kit import audit, render_audit
+    if not args or args[0] in ("-h", "--help", "help"):
+        print("usage: forge audit <dir> [--deep] [--json] [--min-score N]")
+        print("  сводное здоровье проекта: карта, секреты, зависимости, качество")
+        print("  (--deep: ещё и родные тесты). --min-score — гейт для CI.")
+        return 0
+    pos = _positionals(args)
+    out = audit(pos[0] if pos else ".", deep="--deep" in args)
+    if "--json" in args:
+        print(_json.dumps(out, ensure_ascii=False, indent=2))
+    else:
+        print(render_audit(out))
+    gate = _flag(args, "--min-score")
+    if gate:
+        try:
+            threshold = int(gate)
+        except ValueError:
+            threshold = 0
+        if out.get("score", 0) < threshold:
+            print(f"audit: {out.get('score')} < {threshold} — гейт не пройден")
+            return 1
+    return 0 if out.get("ok") else 1
+
+
 def _deps(args: list[str]) -> int:
     """forge deps <dir> [--check] [--json]: инвентарь зависимостей + гигиена."""
     import json as _json
@@ -1205,6 +1233,8 @@ def main(argv: list[str] | None = None) -> int:
         return _doctor(args[1:])
     if cmd == "deps":
         return _deps(args[1:])
+    if cmd == "audit":
+        return _audit(args[1:])
     if cmd == "docs":
         return _docs(args[1:])
     if cmd == "bench":

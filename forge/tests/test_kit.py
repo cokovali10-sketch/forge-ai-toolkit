@@ -118,7 +118,7 @@ def test_scan_secrets_detects_and_masks(tmp_path):
 def test_scan_secrets_private_key(tmp_path):
     from forge.kit import scan_secrets
     (tmp_path / "id_rsa").write_text(
-        "-----BEGIN RSA PRIVATE KEY-----\nMIIabc\n", encoding="utf-8")
+        "-----BEGIN RSA PRIVATE KEY-----\nMIIabc\n", encoding="utf-8")  # forge:allow-secret
     out = scan_secrets(tmp_path)
     assert any(f["kind"] == "private-key" for f in out["findings"])
 
@@ -158,9 +158,49 @@ def test_cli_and_mcp_wired(tmp_path):
     assert main(["map", str(tmp_path), "--json"]) == 0
     assert main(["secrets", str(tmp_path)]) == 0
     assert main(["doctor", "--json"]) == 0
+    assert main(["deps", str(tmp_path), "--json"]) == 0
+    assert main(["audit", str(tmp_path), "--json"]) == 0
     reg = build_default_registry("")
     for tool in ("map.project", "test.detect", "test.run", "ci.generate",
-                 "secrets.scan", "doctor.check"):
+                 "secrets.scan", "doctor.check", "deps.scan", "audit.run"):
         assert tool in reg.tool_owner, tool
     r = reg.call("map.project", {"root": str(tmp_path)})
     assert r["ok"] is True
+
+
+def test_audit_scores_and_sections(tmp_path):
+    from forge.kit import audit, render_audit
+    _py_project(tmp_path)
+    (tmp_path / "conf.py").write_text('password = "hunter2secret"\n',  # forge:allow-secret
+                                      encoding="utf-8")
+    out = audit(tmp_path)
+    assert out["ok"] is True
+    assert 0 <= out["score"] <= 100
+    for sec in ("map", "secrets", "deps", "quality"):
+        assert sec in out["sections"]
+    assert out["counts"]["medium"] >= 1
+    assert isinstance(render_audit(out), str)
+
+
+def test_audit_high_secret_lowers_score(tmp_path):
+    from forge.kit import audit
+    _py_project(tmp_path)
+    clean = audit(tmp_path)["score"]
+    (tmp_path / "k.py").write_text('x = "AKIAABCDEFGHIJKLMNOP"\n',  # forge:allow-secret
+                                   encoding="utf-8")
+    dirty = audit(tmp_path)
+    assert dirty["counts"]["high"] >= 1
+    assert dirty["score"] < clean
+
+
+def test_audit_deep_runs_native_tests(tmp_path):
+    from forge.kit import audit
+    _py_project(tmp_path)
+    out = audit(tmp_path, deep=True)
+    assert out["sections"]["tests"]["ran"] is True
+    assert out["sections"]["tests"]["ok"] is True
+
+
+def test_audit_missing_dir(tmp_path):
+    from forge.kit import audit
+    assert audit(tmp_path / "nope")["ok"] is False

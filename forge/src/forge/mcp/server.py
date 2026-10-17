@@ -351,11 +351,16 @@ def _wire_kit(reg, local) -> None:
                       level=0),
               lambda p: _kit.scan_deps(str(p.get("root", ".")),
                                        check=bool(p.get("check"))))
+    local.add(ToolDef("audit.run",
+                      "One-shot project health: map/secrets/deps/quality (+tests)",
+                      level=1),
+              lambda p: _kit.audit(str(p.get("root", ".")),
+                                   deep=bool(p.get("deep"))))
     reg.add_module(ModuleDef("kit", "Project cannon: map/test/ci/secrets/doctor",
                              "0.1.0",
                              ["map.project", "test.detect", "test.run",
                               "ci.generate", "secrets.scan", "doctor.check",
-                              "deps.scan"]))
+                              "deps.scan", "audit.run"]))
 
 
 def _wire_ui(reg, local) -> None:

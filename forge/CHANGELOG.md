@@ -1,6 +1,14 @@
 # Changelog
 
 ## Unreleased
+- kit: `forge audit <dir>` (`audit.run`) — one-shot project health: composes the
+  project map, secret scan, dependency hygiene and the code-quality score into a
+  single 0..100 score (min over the worst area); `--deep` also runs the native
+  tests, `--min-score N` is a CI gate
+- do: `forge do "<intent>"` suggests an `audit` step first when the intent is
+  about reviewing/auditing (проверь/аудит/утечки/зависимости/health)
+- test: secret fixtures in the test suite carry the `forge:allow-secret` marker
+  on the very line the scanner reads, so FORGE's own audit reports 0 leaks
 - kit: `forge doctor [dir]` (`doctor.check`) — audits the machine: which
   toolchains exist and their versions, what FORGE can really do here; with a
   path it also reports the project's test stack (read-only)

@@ -58,6 +58,11 @@ _GENERATOR_DOMAINS: dict[str, tuple[str, ...]] = {
 }
 
 
+# Намерения «проверить/оценить» -> предложить сводный аудит.
+_AUDIT_WORDS = ("аудит", "проверь", "проверить", "оцени", "оценка", "здоров",
+                "audit", "health", "утечк", "зависимост")
+
+
 def _tokens(text: str) -> set[str]:
     import re
     return {t for t in re.split(r"[^\wа-яё]+", text.lower()) if len(t) > 2}
@@ -145,6 +150,11 @@ def plan(intent: str, root: str, forge_root: str,
     skills = _match_skills(intent, forge_root, kind)
     knowledge = _knowledge(intent, forge_root)
     steps: list[dict[str, Any]] = []
+    if any(w in intent.lower() for w in _AUDIT_WORDS):
+        steps.append({"step": "audit",
+                      "command": f"forge audit \"{root}\"",
+                      "why": "сводная проверка: карта, секреты, зависимости, "
+                             "качество"})
     if kind:
         steps.append({"step": "generate",
                       "command": f"forge make {kind} {name} --out \"{root}\"",

@@ -143,6 +143,7 @@ builds and writes — 2. The client decides what the agent may do.
 | `forge secrets <dir>` | secret-leak scan (keys/tokens/passwords, masked output) |
 | `forge deps <dir>` | dependency inventory + version hygiene (--check: outdated) |
 | `forge doctor [dir]` | audit toolchains/versions and FORGE capabilities here |
+| `forge audit <dir>` | one-shot project health (map/secrets/deps/quality) |
 | `forge refactor <file\|dir>` | clean-code advisor: long functions, nesting, duplicates, magic numbers |
 | `forge do "<intent>"` | orchestrator: generator, modules, skills, knowledge, plan, verify |
 | `forge loop <dir>` | closed loop: conveyor → repair bundles → safe fixes → retry |
@@ -201,9 +202,9 @@ forge quality . --min-score 80 --max-regression 2
 
 For agents: `do.plan`, `do.run`, `loop.run`, `quality.report`.
 
-## The `kit` arsenal: `map`, `test`, `ci`, `secrets`, `deps`, `doctor`
+## The `kit` arsenal: `map`, `test`, `ci`, `secrets`, `deps`, `doctor`, `audit`
 
-Six commands that turn FORGE into a cannon for any project.
+Seven commands that turn FORGE into a cannon for any project.
 
 - `forge map <dir>` - instant map of unfamiliar code: languages and lines of
   code, build files, guessed entry points, largest files, the internal Python
@@ -226,6 +227,10 @@ Six commands that turn FORGE into a cannon for any project.
 - `forge doctor [dir]` - audits the machine: which toolchains are present and
   their versions, and what FORGE can really do here. With a path it also
   reports the project's test stack. Read-only.
+- `forge audit <dir>` - one command for overall project health: map, secret
+  leaks, dependency hygiene and a code-quality score, combined into a 0..100
+  score (the minimum over the "worst" area). `--deep` also runs the native
+  tests, `--min-score N` is a CI gate.
 
 ```bat
 forge map .                       :: project map
@@ -234,10 +239,11 @@ forge ci .                        :: generate CI
 forge secrets .                   :: check for leaks
 forge deps . --check              :: deps and outdated
 forge doctor .                    :: what is available, what to do
+forge audit . --min-score 80      :: overall health + gate
 ```
 
 For agents: `map.project`, `test.detect`, `test.run`, `ci.generate`,
-`secrets.scan`, `deps.scan`, `doctor.check`.
+`secrets.scan`, `deps.scan`, `doctor.check`, `audit.run`.
 
 ## The `pipe` conveyor in detail
 
@@ -274,7 +280,7 @@ reason (`.forge-suppress.json`), line-level via `# forge-ignore`.
 Now: core, conveyor (8 stages), lab, 5 languages, editor, generators (`web`,
 `python-service`, `go-cli`, `node-api`, `rust-cli`, `paper`) + `make`, the
 `map`/`test`/`ci`/`secrets`/`deps`/`doctor` arsenal, the `refactor` advisor, the
-`do`/`loop`/`quality` autopilot, a first arena entry (reference 3/3), 173 green
+`do`/`loop`/`quality` autopilot, a first arena entry (reference 3/3), 178 green
 tests.
 Honestly not done: desktop app (needs Rust for Tauri - no cargo on this machine),
 GUI screenshots, auto-client — marked `NOT_IMPLEMENTED`.

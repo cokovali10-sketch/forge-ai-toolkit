@@ -51,3 +51,13 @@ def test_skills_match_explicit_domain(tmp_path):
     ref = plan("отрефактори код, слишком длинный и вложенный метод",
                str(tmp_path), root)
     assert any(s["domain"] == "clean-code" for s in ref["skills"])
+
+
+def test_plan_suggests_audit_on_review_intent(tmp_path):
+    from forge.orchestrate import plan
+    root = "D:/Forge-Factority/forge"
+    pl = plan("проверь проект на утечки и зависимости", str(tmp_path), root)
+    assert pl["steps"][0]["step"] == "audit"
+    assert "forge audit" in pl["steps"][0]["command"]
+    plain = plan("сделай лендинг для кофейни", str(tmp_path), root)
+    assert all(s["step"] != "audit" for s in plain["steps"])

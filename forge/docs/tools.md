@@ -1,6 +1,10 @@
 # Tool Catalog (generated — do not edit by hand)
 
-SOURCE_OF_TRUTH = registry (54 tools)
+SOURCE_OF_TRUTH = registry (55 tools)
+
+## audit.run
+- module: kit, backend: local, level: 1
+- One-shot project health: map/secrets/deps/quality (+tests)
 
 ## ci.generate
 - module: kit, backend: local, level: 1
