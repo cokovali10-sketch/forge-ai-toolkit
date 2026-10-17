@@ -156,6 +156,66 @@ def test_generic_no_false_magic_in_strings_and_comments(tmp_path):
     assert res["total"] == 0
 
 
+def test_apply_extracts_repeated_constants(tmp_path):
+    from forge.refactor import api as rapi
+    p = tmp_path / "m.py"
+    p.write_text("def f(x):\n    if x > 99999:\n        return 99999\n"
+                 "    return x\n", encoding="utf-8")
+    res = rapi.apply(str(p))
+    assert res["ok"] and res["changed"]
+    text = p.read_text(encoding="utf-8")
+    assert "CONST_99999 = 99999" in text
+    assert text.count("CONST_99999") == 3
+    assert not (tmp_path / "m.py.forgebak").exists()
+    ns: dict = {}
+    exec(compile(text, str(p), "exec"), ns)  # behavior preserved
+    assert ns["f"](100000) == 99999 and ns["f"](1) == 1
+
+
+def test_apply_noop_without_repeats(tmp_path):
+    from forge.refactor import api as rapi
+    p = tmp_path / "m.py"
+    p.write_text("def f(x):\n    return x + 99999\n", encoding="utf-8")
+    before = p.read_text(encoding="utf-8")
+    res = rapi.apply(str(p))
+    assert res["ok"] and not res["changed"]
+    assert p.read_text(encoding="utf-8") == before
+
+
+def test_apply_rollback_on_test_failure(tmp_path):
+    import sys
+    from forge.refactor import api as rapi
+    p = tmp_path / "m.py"
+    src = "def f(x):\n    return 99999 + 99999\n"
+    p.write_text(src, encoding="utf-8")
+    res = rapi.apply(str(p),
+                     test_cmd=[sys.executable, "-c", "import sys; sys.exit(1)"],
+                     run_tests=True)
+    assert not res["ok"] and not res["changed"]
+    assert p.read_text(encoding="utf-8") == src
+    assert not (tmp_path / "m.py.forgebak").exists()
+
+
+def test_apply_keeps_docstring_first(tmp_path):
+    from forge.refactor import api as rapi
+    p = tmp_path / "m.py"
+    p.write_text('"""Doc."""\n\n\ndef f():\n    return 7 + 7\n',
+                 encoding="utf-8")
+    res = rapi.apply(str(p))
+    assert res["ok"] and res["changed"]
+    text = p.read_text(encoding="utf-8")
+    assert text.startswith('"""Doc."""')
+    assert "CONST_7 = 7" in text
+
+
+def test_apply_non_python(tmp_path):
+    from forge.refactor import api as rapi
+    p = tmp_path / "m.js"
+    p.write_text("const x = 1;\n", encoding="utf-8")
+    res = rapi.apply(str(p))
+    assert res["ok"] and not res["changed"]
+
+
 def test_pipe_clean_code_stage(tmp_path):
     from forge.pipe.runner import PipeRunner
     from forge.pipe.stages import DEFAULT_STAGES

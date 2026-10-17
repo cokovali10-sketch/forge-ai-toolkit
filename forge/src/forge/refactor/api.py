@@ -43,3 +43,10 @@ def sarif(path: str | Path) -> dict[str, Any]:
     """SARIF 2.1.0 находок чистого кода для GitHub code scanning."""
     from forge.refactor.sarif import findings_to_sarif
     return findings_to_sarif(inspect(path))
+
+
+def apply(path: str | Path, test_cmd: list[str] | None = None,
+          run_tests: bool = False) -> dict[str, Any]:
+    """Безопасные авто-фиксы с бэкапом, проверкой синтаксиса и авто-откатом."""
+    from forge.refactor.apply import apply as _apply
+    return _apply(path, test_cmd=test_cmd, run_tests=run_tests)

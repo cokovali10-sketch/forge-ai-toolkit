@@ -219,8 +219,13 @@ def _wire_refactor(reg, local) -> None:
               lambda p: _api.plan(str(p.get("path", ""))))
     local.add(ToolDef("refactor.sarif", "Clean-code findings as SARIF 2.1.0", level=0),
               lambda p: _api.sarif(str(p.get("path", ""))))
+    local.add(ToolDef("refactor.apply", "Apply safe auto-fixes (backup+verify+rollback)", level=2),
+              lambda p: _api.apply(str(p.get("path", "")),
+                                   test_cmd=p.get("test_cmd"),
+                                   run_tests=bool(p.get("run_tests"))))
     reg.add_module(ModuleDef("refactor", "Clean-code advisor", "0.1.0",
-                             ["refactor.inspect", "refactor.plan", "refactor.sarif"]))
+                             ["refactor.inspect", "refactor.plan", "refactor.sarif",
+                              "refactor.apply"]))
 
 
 def _wire_gen(reg, local) -> None:

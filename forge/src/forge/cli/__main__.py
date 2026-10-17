@@ -445,14 +445,32 @@ def _refactor(args: list[str]) -> int:
     from forge.refactor import api as _api
     if not args or args[0] in ("-h", "--help", "help"):
         print("usage: forge refactor <file|dir> [--plan] [--suggest] [--sarif PATH]")
+        print("       forge refactor <file.py> --apply [--test \"cmd\"]")
         print("  (без флагов)  список находок + оценка здоровья 0..100")
         print("  --plan        приоритетный план: что чинить первым, дешевле/серьёзнее")
         print("  --suggest     только советы, сгруппированные по файлам")
         print("  --sarif PATH  выгрузить находки в SARIF 2.1.0 (GitHub code scanning)")
+        print("  --apply       авто-фикс повторяющихся магических чисел (Python),")
+        print("                с бэкапом, проверкой синтаксиса и авто-откатом")
+        print("  --test \"cmd\"  прогнать тесты после фикса (иначе откат)")
         print("находит: длинные функции, вложенность, дубли, магические числа,")
         print("         много аргументов, God-классы, высокую цикломатику")
         return 0
     target = args[0]
+    if "--apply" in args:
+        import shlex
+        test_cmd = None
+        run_tests = False
+        if "--test" in args:
+            i = args.index("--test")
+            if i + 1 >= len(args):
+                print("нужна команда после --test")
+                return 2
+            test_cmd = shlex.split(args[i + 1])
+            run_tests = True
+        res = _api.apply(target, test_cmd=test_cmd, run_tests=run_tests)
+        print(_json.dumps(res, ensure_ascii=False, indent=2))
+        return 0 if res.get("ok") else 1
     if "--sarif" in args:
         i = args.index("--sarif")
         if i + 1 >= len(args):
