@@ -450,12 +450,14 @@ def _refactor(args: list[str]) -> int:
         print("  --plan        приоритетный план: что чинить первым, дешевле/серьёзнее")
         print("  --suggest     только советы, сгруппированные по файлам")
         print("  --sarif PATH  выгрузить находки в SARIF 2.1.0 (GitHub code scanning)")
-        print("  --apply       авто-фикс: мёртвые импорты + повторяющиеся числа")
-        print("                (Python), с бэкапом, проверкой и авто-откатом")
+        print("  --apply       авто-фикс: мёртвые импорты, повторяющиеся числа,")
+        print("                сравнения == None -> is None (Python), с бэкапом,")
+        print("                проверкой и авто-откатом")
         print("  --test \"cmd\"  прогнать тесты после фикса (иначе откат)")
-        print("  --only KIND   только один фикс: imports | constants")
+        print("  --only KIND   только один фикс: imports | constants | comparisons")
         print("находит: длинные функции, вложенность, дубли, магические числа,")
-        print("         много аргументов, God-классы, цикломатику, мёртвые импорты")
+        print("         много аргументов, God-классы, цикломатику, мёртвые импорты,")
+        print("         сравнения с None/True/False")
         return 0
     target = args[0]
     if "--apply" in args:

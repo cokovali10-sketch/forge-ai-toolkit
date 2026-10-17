@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- refactor: new safe auto-fix — PEP8 comparisons (`== None`/`!= True` …) are
+  rewritten to `is` / `is not`; detected as `simplifiable-comparison`,
+  applied via `--apply` or `--only comparisons`
+- refactor: Python files are read as `utf-8-sig`, so sources saved with a UTF-8
+  BOM (common on Windows editors) are analyzed and fixed instead of failing to
+  parse
 - do: skill routing no longer false-matches on generic words — a generic token
   like `api` (from "Bukkit API") used to pull an unrelated Minecraft skill into
   a REST-API intent; now `forge do` requires an explicit domain hit or several

@@ -314,6 +314,61 @@ def _unused_imports(tree: ast.Module, lines: list[str]) -> list[Issue]:
     return issues
 
 
+def _is_bool_or_none(value: Any) -> bool:
+    # `is` вместо `in {}`: 1 == True, поэтому множество дало бы ложное срабатывание.
+    return value is None or value is True or value is False
+
+
+def _comparison_edits(tree: ast.Module, lines: list[str]) -> list[dict[str, Any]]:
+    """Сравнения с None/True/False, которые PEP8 велит писать через `is`.
+
+    Возвращает безопасные правки `{line, start, end, repl}` — смещения в байтах
+    UTF-8 (как у `ast`), `repl` уже в байтах. Многострочные и неоднозначные
+    (с комментарием между операндами) сравнения пропускаются."""
+    edits: list[dict[str, Any]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Compare) or len(node.ops) != 1:
+            continue
+        op = node.ops[0]
+        if not isinstance(op, (ast.Eq, ast.NotEq)) or not node.comparators:
+            continue
+        left = node.left
+        right = node.comparators[0]
+        const = None
+        if isinstance(right, ast.Constant) and _is_bool_or_none(right.value):
+            const = right
+        elif isinstance(left, ast.Constant) and _is_bool_or_none(left.value):
+            const = left
+        if const is None:
+            continue
+        if left.end_lineno != right.lineno or left.end_col_offset is None:
+            continue
+        line_no = left.end_lineno
+        start, end = left.end_col_offset, right.col_offset
+        bl = lines[line_no - 1].encode("utf-8") if 1 <= line_no <= len(lines) else b""
+        op_text = b"==" if isinstance(op, ast.Eq) else b"!="
+        if bl[start:end].replace(b" ", b"").replace(b"\t", b"") != op_text:
+            continue
+        kw = b"is" if isinstance(op, ast.Eq) else b"is not"
+        edits.append({"line": line_no, "start": start, "end": end,
+                      "repl": b" " + kw + b" "})
+    return edits
+
+
+def _simplifiable_comparisons(tree: ast.Module, lines: list[str]) -> list[Issue]:
+    """Сравнения `== None` / `!= True` и т.п. — переписываются в `is`/`is not`."""
+    issues: list[Issue] = []
+    for e in _comparison_edits(tree, lines):
+        ln = e["line"]
+        issues.append(Issue(
+            kind="simplifiable-comparison", file="", line=ln,
+            message="сравнение с None/True/False через == или !=",
+            suggestion="Пиши через `is` / `is not` (PEP8; forge refactor --apply сделает сам)",
+            severity="low",
+            context=lines[ln - 1].strip() if 1 <= ln <= len(lines) else ""))
+    return issues
+
+
 DEFAULT_CODE_EXTS = (".py", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
                      ".go", ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".h",
                      ".java", ".kt", ".rs")
@@ -333,7 +388,7 @@ def analyze_file(path: str | Path) -> dict[str, Any]:
 def _analyze_python(p: Path) -> dict[str, Any]:
     """Анализ Python-файла через AST."""
     try:
-        text = p.read_text(encoding="utf-8")
+        text = p.read_text(encoding="utf-8-sig")
     except (OSError, UnicodeError) as e:
         return {"file": str(p), "ok": False, "error": f"не удалось прочитать: {e}"}
     lines = text.splitlines()
@@ -355,6 +410,7 @@ def _analyze_python(p: Path) -> dict[str, Any]:
     issues.extend(_magic_numbers(tree, lines))
     issues.extend(_duplicate_blocks(lines))
     issues.extend(_unused_imports(tree, lines))
+    issues.extend(_simplifiable_comparisons(tree, lines))
 
     for issue in issues:
         issue.file = str(p)
@@ -392,6 +448,7 @@ _KIND_EFFORT = {
     "magic-number": "S",
     "duplicate-block": "S",
     "unused-import": "S",
+    "simplifiable-comparison": "S",
     "too-many-args": "M",
     "deep-nesting": "M",
     "high-complexity": "M",

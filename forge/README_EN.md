@@ -151,8 +151,8 @@ builds and writes — 2. The client decides what the agent may do.
 `forge refactor <file|dir>` finds what makes code hard to read — long
 functions (>50 lines), deep nesting (>3), duplicated blocks (3+ lines), magic
 numbers, functions with too many args, God-classes (>200 lines), high
-cyclomatic complexity (>10), unused imports (dead code) — and gives a concrete
-"extract / guard-clause /
+cyclomatic complexity (>10), unused imports (dead code), `== None`/`!= True`
+comparisons — and gives a concrete "extract / guard-clause /
 named constant" suggestion for each, plus a **health score 0..100**. It only
 recommends structure, never changes behavior. Python is parsed via AST;
 JS/TS, Go, C++, Java, Kotlin and Rust via a brace-based heuristic.
@@ -165,7 +165,7 @@ forge refactor app.py --apply --test "pytest -q"
 
 `--apply` extracts repeated magic numbers into named constants and removes dead
 imports — with a backup, a syntax check, your tests, and **automatic rollback**
-if anything fails. `--only imports|constants` picks a single kind of fix.
+if anything fails. `--only imports|constants|comparisons` picks a single kind of fix.
 For agents: `refactor.inspect`, `refactor.plan`, `refactor.sarif`,
 `refactor.apply`. Skill: `refactor-expert`.
 
@@ -226,7 +226,7 @@ reason (`.forge-suppress.json`), line-level via `# forge-ignore`.
 ## Status and roadmap
 
 Now: core, conveyor, lab, 5 languages, editor, generators + `make`, the
-`refactor` advisor, the `do`/`loop`/`quality` autopilot, 142 green tests.
+`refactor` advisor, the `do`/`loop`/`quality` autopilot, 148 green tests.
 Honestly not done: desktop app (needs Node for Tauri), GUI screenshots,
 auto-client — marked `NOT_IMPLEMENTED`.
 Next: project generators (web/Python/Go), first arena entry, PyPI release.

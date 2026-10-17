@@ -310,3 +310,68 @@ def test_pipe_clean_code_stage(tmp_path):
     warns = r.stages[0].get("warnings", [])
     assert any("чистый код" in w for w in warns)
 
+
+def test_simplifiable_comparison_detected(tmp_path):
+    from forge.refactor.clean_code import analyze_file
+    p = tmp_path / "c.py"
+    p.write_text("def f(x):\n    if x == None:\n        return True\n",
+                 encoding="utf-8")
+    kinds = {i["kind"] for i in analyze_file(p)["issues"]}
+    assert "simplifiable-comparison" in kinds
+
+
+def test_comparison_not_matched_for_ints(tmp_path):
+    from forge.refactor.clean_code import analyze_file
+    p = tmp_path / "c.py"
+    p.write_text("def f(x):\n    return x == 1\n", encoding="utf-8")
+    kinds = {i["kind"] for i in analyze_file(p)["issues"]}
+    assert "simplifiable-comparison" not in kinds
+
+
+def test_apply_comparisons_rewrites(tmp_path):
+    from forge.refactor import api as rapi
+    p = tmp_path / "c.py"
+    p.write_text(
+        "def f(x):\n"
+        "    if x == None:\n"
+        "        return 1\n"
+        "    if x != True:\n"
+        "        return 2\n"
+        "    return 0\n", encoding="utf-8")
+    res = rapi.apply(str(p), only="comparisons")
+    assert res["ok"] and res["changed"]
+    assert res["fixed_comparisons"] == 2
+    text = p.read_text(encoding="utf-8")
+    assert "is None" in text and "is not True" in text
+    assert "== None" not in text and "!= True" not in text
+    assert not (tmp_path / "c.py.forgebak").exists()
+    ns: dict = {}
+    exec(compile(text, str(p), "exec"), ns)  # behavior preserved
+    assert ns["f"](None) == 1 and ns["f"](0) == 2 and ns["f"](True) == 0
+
+
+def test_apply_comparisons_idempotent(tmp_path):
+    from forge.refactor import api as rapi
+    p = tmp_path / "c.py"
+    p.write_text("def f(x):\n    return x is None\n", encoding="utf-8")
+    res = rapi.apply(str(p), only="comparisons")
+    assert res["ok"] and not res["changed"]
+
+
+def test_bom_file_is_handled(tmp_path):
+    from forge.refactor import api as rapi
+    p = tmp_path / "b.py"
+    p.write_bytes(b"\xef\xbb\xbfdef f(x):\n    if x == None:\n        return 1\n")
+    res = rapi.apply(str(p), only="comparisons")
+    assert res["ok"] and res["changed"]
+    assert "is None" in p.read_text(encoding="utf-8")
+
+
+def test_bom_file_can_be_analyzed(tmp_path):
+    from forge.refactor.clean_code import analyze_file
+    p = tmp_path / "b.py"
+    p.write_bytes(b"\xef\xbb\xbfdef f(x):\n    if x == None:\n        return 1\n")
+    res = analyze_file(p)
+    assert res["ok"] is True
+    assert any(i["kind"] == "simplifiable-comparison" for i in res["issues"])
+

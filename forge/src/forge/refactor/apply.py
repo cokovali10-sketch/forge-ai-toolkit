@@ -55,7 +55,7 @@ def apply_magic_constants(path: str | Path) -> dict[str, Any]:
     p = Path(path)
     if p.suffix.lower() != ".py":
         return {"changed": False, "reason": "авто-фикс пока только для Python"}
-    text = p.read_text(encoding="utf-8")
+    text = p.read_text(encoding="utf-8-sig")
     try:
         tree = ast.parse(text)
     except SyntaxError as e:
@@ -131,7 +131,7 @@ def apply_unused_imports(path: str | Path) -> dict[str, Any]:
     p = Path(path)
     if p.suffix.lower() != ".py":
         return {"changed": False, "reason": "авто-фикс пока только для Python"}
-    text = p.read_text(encoding="utf-8")
+    text = p.read_text(encoding="utf-8-sig")
     try:
         tree = ast.parse(text)
     except SyntaxError as e:
@@ -169,26 +169,65 @@ def apply_unused_imports(path: str | Path) -> dict[str, Any]:
     return {"changed": True, "removed_imports": sorted(set(removed))}
 
 
+def apply_comparisons(path: str | Path) -> dict[str, Any]:
+    """Переписывает `== None`/`!= None`/`== True/False` в `is`/`is not` (PEP8).
+
+    Поведение не меняется: `is` для синглтонов эквивалентен сравнению по
+    значению, но корректнее и быстрее."""
+    p = Path(path)
+    if p.suffix.lower() != ".py":
+        return {"changed": False, "reason": "авто-фикс пока только для Python"}
+    text = p.read_text(encoding="utf-8-sig")
+    try:
+        tree = ast.parse(text)
+    except SyntaxError as e:
+        return {"changed": False, "reason": f"файл не парсится: {e}"}
+
+    from forge.refactor.clean_code import _comparison_edits
+    edits = _comparison_edits(tree, text.splitlines())
+    if not edits:
+        return {"changed": False, "reason": "нет сравнений с None/True/False"}
+
+    lines = text.splitlines(keepends=True)
+    by_line: dict[int, list[dict[str, Any]]] = {}
+    for e in edits:
+        by_line.setdefault(e["line"], []).append(e)
+    for line_no, items in by_line.items():
+        # снова байтовые смещения: правим справа налево, чтобы не сбить индексы
+        bl = lines[line_no - 1].encode("utf-8")
+        for e in sorted(items, key=lambda x: x["start"], reverse=True):
+            bl = bl[:e["start"]] + e["repl"] + bl[e["end"]:]
+        lines[line_no - 1] = bl.decode("utf-8")
+
+    p.write_text("".join(lines), encoding="utf-8")
+    return {"changed": True, "fixed_comparisons": len(edits)}
+
+
 def apply(path: str | Path, test_cmd: list[str] | None = None,
           run_tests: bool = False, only: str | None = None) -> dict[str, Any]:
     """Применить безопасные фиксы с бэкапом, проверкой и авто-откатом.
 
-    `only` позволяет выбрать один вид фикса: `"imports"` (мёртвые импорты) или
-    `"constants"` (магические числа). `None` — оба."""
+    `only` позволяет выбрать один вид фикса: `"imports"` (мёртвые импорты),
+    `"constants"` (магические числа) или `"comparisons"` (`== None` -> `is None`).
+    `None` — все виды."""
     p = Path(path)
     if not p.is_file():
         return {"ok": False, "changed": False, "error": f"файл не найден: {p}"}
-    original = p.read_text(encoding="utf-8")
+    original = p.read_text(encoding="utf-8-sig")
     backup = p.with_suffix(p.suffix + ".forgebak")
     backup.write_text(original, encoding="utf-8")
 
     fix_imports = (apply_unused_imports(p) if only in (None, "imports")
                    else {"changed": False})
+    fix_cmp = (apply_comparisons(p) if only in (None, "comparisons")
+               else {"changed": False})
     fix_magic = (apply_magic_constants(p) if only in (None, "constants")
                  else {"changed": False})
-    if not (fix_imports.get("changed") or fix_magic.get("changed")):
+    if not (fix_imports.get("changed") or fix_cmp.get("changed")
+            or fix_magic.get("changed")):
         backup.unlink(missing_ok=True)
-        reason = fix_magic.get("reason") or fix_imports.get("reason") or "нечего чинить"
+        reason = (fix_magic.get("reason") or fix_cmp.get("reason")
+                  or fix_imports.get("reason") or "нечего чинить")
         return {"ok": True, "changed": False, "reason": reason}
 
     def rollback(reason: str, extra: dict | None = None) -> dict[str, Any]:
@@ -200,7 +239,7 @@ def apply(path: str | Path, test_cmd: list[str] | None = None,
         return out
 
     try:
-        ast.parse(p.read_text(encoding="utf-8"))
+        ast.parse(p.read_text(encoding="utf-8-sig"))
         py_compile.compile(str(p), doraise=True)
     except Exception as e:  # noqa: BLE001
         return rollback(f"проверка синтаксиса не прошла, откат: {e}")
@@ -226,4 +265,6 @@ def apply(path: str | Path, test_cmd: list[str] | None = None,
         out["occurrences"] = fix_magic["occurrences"]
     if fix_imports.get("changed"):
         out["removed_imports"] = fix_imports["removed_imports"]
+    if fix_cmp.get("changed"):
+        out["fixed_comparisons"] = fix_cmp["fixed_comparisons"]
     return out
