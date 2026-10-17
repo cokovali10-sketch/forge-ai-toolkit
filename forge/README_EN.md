@@ -146,8 +146,9 @@ builds and writes — 2. The client decides what the agent may do.
 
 `forge refactor <file|dir>` finds what makes code hard to read — long
 functions (>50 lines), deep nesting (>3), duplicated blocks (3+ lines), magic
-numbers, functions with too many args, God-classes (>200 lines) — and gives a
-concrete "extract / guard-clause / named constant" suggestion for each. It only
+numbers, functions with too many args, God-classes (>200 lines), high
+cyclomatic complexity (>10) — and gives a concrete "extract / guard-clause /
+named constant" suggestion for each, plus a **health score 0..100**. It only
 recommends structure, never changes behavior. For agents: `refactor.inspect`.
 
 ## The `pipe` conveyor in detail

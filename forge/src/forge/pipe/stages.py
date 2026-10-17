@@ -267,13 +267,14 @@ def stage_clean_code(ctx: dict[str, Any]) -> ToolResult:
                     sev[i["severity"]] = sev.get(i["severity"], 0) + 1
                     kinds[i["kind"]] = kinds.get(i["kind"], 0) + 1
             total = res.get("total_issues", 0)
+            score = res.get("score", 100)
             if total:
-                warns.append(f"чистый код: {total} замечаний "
+                warns.append(f"чистый код: {total} замечаний, здоровье {score}/100 "
                              f"(high={sev['high']}, medium={sev['medium']}, "
                              f"low={sev['low']}); см. skill refactor-expert")
                 top = sorted(kinds.items(), key=lambda kv: -kv[1])[:5]
                 warns.append("виды: " + ", ".join(f"{k}×{v}" for k, v in top))
-            return {"issues": total, "by_severity": sev, "by_kind": kinds}
+            return {"issues": total, "score": score, "by_severity": sev, "by_kind": kinds}
         return {"issues": res.get("total", 0)}
     r = timed(run)
     if r.ok and warns:

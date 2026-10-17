@@ -40,6 +40,39 @@ class Issue:
         }
 
 
+def _complexity(fn: ast.AST) -> int:
+    """Цикломатическая сложность функции: 1 + число точек ветвления.
+
+    Не заходит во вложенные функции — у каждой своя сложность."""
+    branch_types: tuple = (ast.If, ast.For, ast.AsyncFor, ast.While,
+                           ast.ExceptHandler, ast.With, ast.AsyncWith,
+                           ast.BoolOp, ast.IfExp, ast.comprehension, ast.Assert)
+    match_type = getattr(ast, "Match", None)
+    total = 1
+    stack = list(getattr(fn, "body", []))
+    while stack:
+        node = stack.pop()
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            continue
+        if isinstance(node, branch_types) or (match_type and isinstance(node, match_type)):
+            total += 1
+        stack.extend(ast.iter_child_nodes(node))
+    return total
+
+
+_WEIGHTS = {"high": 5.0, "medium": 2.0, "low": 0.5}
+
+
+def score_of(issues: list[dict[str, Any]], files: int = 1) -> int:
+    """Оценка здоровья кода 0..100: 100 = чисто.
+
+    Штраф взвешен по серьёзности и нормирован на число файлов, поэтому
+    большой проект не обнуляется лишь оттого, что в нём много кода."""
+    penalty = sum(_WEIGHTS.get(i.get("severity", ""), 0.0) for i in issues)
+    per_file = penalty / max(1, files)
+    return max(0, min(100, round(100 - per_file)))
+
+
 class _FunctionVisitor(ast.NodeVisitor):
     """Собирает функции с их границами и количеством аргументов."""
 
@@ -80,6 +113,16 @@ class _FunctionVisitor(ast.NodeVisitor):
                 severity="high",
                 context=self._line(start),
             ))
+        cc = _complexity(node)
+        if cc > 10:
+            self.issues.append(Issue(
+                kind="high-complexity",
+                file="", line=start,
+                message=f"'{node.name}': цикломатическая сложность {cc} (>10)",
+                suggestion="Разбей на функции по ветвям/случаям; вынеси условия в именованные предикаты",
+                severity="high",
+                context=self._line(start),
+            ))
 
     def _line(self, lineno: int) -> str:
         if 1 <= lineno <= len(self.lines):
@@ -87,26 +130,31 @@ class _FunctionVisitor(ast.NodeVisitor):
         return ""
 
     def visit_For(self, node: ast.For) -> None:
-        self._check_depth(node, "for")
+        self._enter(node)
         self.generic_visit(node)
+        self._depth -= 1
 
     def visit_While(self, node: ast.While) -> None:
-        self._check_depth(node, "while")
+        self._enter(node)
         self.generic_visit(node)
+        self._depth -= 1
 
     def visit_If(self, node: ast.If) -> None:
-        self._check_depth(node, "if")
+        self._enter(node)
         self.generic_visit(node)
+        self._depth -= 1
 
     def visit_With(self, node: ast.With) -> None:
-        self._check_depth(node, "with")
+        self._enter(node)
         self.generic_visit(node)
+        self._depth -= 1
 
     def visit_Try(self, node: ast.Try) -> None:
-        self._check_depth(node, "try")
+        self._enter(node)
         self.generic_visit(node)
+        self._depth -= 1
 
-    def _check_depth(self, node: ast.AST, kind: str) -> None:
+    def _enter(self, node: ast.AST) -> None:
         self._depth += 1
         self._max_depth = max(self._max_depth, self._depth)
         if self._depth > 3:
@@ -118,8 +166,6 @@ class _FunctionVisitor(ast.NodeVisitor):
                 severity="high",
                 context=self._line(node.lineno),
             ))
-        self.generic_visit(node)
-        self._depth -= 1
 
 
 class _ModuleVisitor(ast.NodeVisitor):
@@ -232,11 +278,13 @@ def analyze_file(path: str | Path) -> dict[str, Any]:
     for issue in issues:
         issue.file = str(p)
 
+    dicts = [i.to_dict() for i in issues]
     return {
         "file": str(p),
         "ok": True,
-        "issues": [i.to_dict() for i in issues],
+        "issues": dicts,
         "total": len(issues),
+        "score": score_of(dicts),
     }
 
 
@@ -245,10 +293,14 @@ def analyze_dir(root: str | Path, exts: tuple[str, ...] = (".py",)) -> dict[str,
     base = Path(root)
     results: list[dict[str, Any]] = []
     total = 0
+    all_issues: list[dict[str, Any]] = []
     for fp in sorted(base.rglob("*")):
         if fp.is_file() and fp.suffix.lower() in exts:
             if any(skip in fp.parts for skip in (".git", ".venv", "venv", "__pycache__", "node_modules")):
                 continue
-            results.append(analyze_file(fp))
-            total += results[-1]["total"]
-    return {"root": str(root), "files": len(results), "total_issues": total, "files_analyzed": results}
+            res = analyze_file(fp)
+            results.append(res)
+            total += res["total"]
+            all_issues.extend(res.get("issues", []))
+    return {"root": str(root), "files": len(results), "total_issues": total,
+            "score": score_of(all_issues, len(results)), "files_analyzed": results}

@@ -23,11 +23,13 @@ def suggest(path: str | Path) -> dict[str, Any]:
         return res
     if "files_analyzed" in res:
         # директория
-        out = {"root": res["root"], "total_issues": res["total_issues"], "files": res["files"]}
+        out = {"root": res["root"], "total_issues": res["total_issues"],
+               "score": res.get("score", 100), "files": res["files"]}
         recommendations = []
         for f in res["files_analyzed"]:
             if f.get("issues"):
                 recommendations.append({"file": f["file"], "issues": f["issues"]})
         out["files_with_issues"] = recommendations
         return out
-    return {"file": res["file"], "issues": res.get("issues", []), "total": res.get("total", 0)}
+    return {"file": res["file"], "issues": res.get("issues", []),
+            "total": res.get("total", 0), "score": res.get("score", 100)}

@@ -8,6 +8,8 @@
 - refactor: clean-code advisor (`forge refactor`, MCP `refactor.inspect`) —
   long functions, deep nesting, duplicate blocks, magic numbers, too many args,
   God-classes; structure-only, never changes behavior
+- refactor: cyclomatic complexity (>10 flagged) + project health score 0..100
+  (severity-weighted, normalized per file)
 - pipe: new advisory stage `clean-code` (6/7, allow_fail) surfaces a refactor
   plan each run; skill `refactor-expert` gives agents the safe recipe
 - docs: conveyor is now 7 stages (clean-code before lab-e2e)

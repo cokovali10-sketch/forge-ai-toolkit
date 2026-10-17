@@ -30,6 +30,11 @@ def _duplicate_block() -> str:
     return block + block
 
 
+def _branchy() -> str:
+    conds = "\n".join(f"    if a and b or c:\n        x = {i}" for i in range(6))
+    return f"def branchy(a, b, c):\n    x = 0\n{conds}\n    return x\n"
+
+
 def test_all_kinds_detected(tmp_path):
     from forge.refactor.clean_code import analyze_file
     p = tmp_path / "bad.py"
@@ -42,6 +47,28 @@ def test_all_kinds_detected(tmp_path):
     for expected in ("long-function", "too-many-args", "deep-nesting",
                      "god-class", "magic-number", "duplicate-block"):
         assert expected in kinds, (expected, kinds)
+
+
+def test_nesting_reported_once(tmp_path):
+    from forge.refactor.clean_code import analyze_file
+    p = tmp_path / "n.py"
+    p.write_text(_deep_nesting(), encoding="utf-8")
+    n = [i for i in analyze_file(p)["issues"] if i["kind"] == "deep-nesting"]
+    assert len(n) == 1  # depth 4 only once — no double AST traversal
+
+
+def test_complexity_and_score(tmp_path):
+    from forge.refactor.clean_code import analyze_file, score_of
+    p = tmp_path / "cx.py"
+    p.write_text(_branchy(), encoding="utf-8")
+    res = analyze_file(p)
+    kinds = {i["kind"] for i in res["issues"]}
+    assert "high-complexity" in kinds
+    assert 0 <= res["score"] < 100
+    assert score_of([]) == 100
+    good = tmp_path / "good.py"
+    good.write_text("def add(a, b):\n    return a + b\n", encoding="utf-8")
+    assert analyze_file(good)["score"] == 100
 
 
 def test_clean_file_ok(tmp_path):
