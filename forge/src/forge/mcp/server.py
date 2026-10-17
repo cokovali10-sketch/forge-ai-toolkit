@@ -116,6 +116,7 @@ def build_default_registry(anvil_dir: str = "") -> Registry:
     _wire_refactor(reg, local)
     _wire_pipe(reg, local)
     _wire_loop(reg, local)
+    _wire_quality(reg, local)
     _wire_more(reg, local, anvil_dir)
     if anvil_dir and Path(anvil_dir, "anvil_call.py").is_file():
         reg.add_backend("anvil", AnvilBackend(anvil_dir))
@@ -272,6 +273,7 @@ def _wire_loop(reg, local) -> None:
     """Self-healing loop: pipe -> bundles -> safe fixes -> retry."""
     from pathlib import Path as _P
     from ..core.registry import ToolDef
+    from ..orchestrate import plan as _do_plan, run as _do_run
     from ..pipe.loop import run_loop as _run_loop
     root = str(_P(__file__).resolve().parents[3])
     local.add(ToolDef("loop.run", "Run pipe and self-heal up to N attempts", level=2),
@@ -279,7 +281,31 @@ def _wire_loop(reg, local) -> None:
                                   max_attempts=int(p.get("attempts", 3)),
                                   serial=bool(p.get("serial")),
                                   auto_fix=bool(p.get("auto_fix", True))))
-    reg.add_module(ModuleDef("loop", "Self-healing loop", "0.1.0", ["loop.run"]))
+    local.add(ToolDef("do.plan", "Turn an intent into an executable plan", level=0),
+              lambda p: _do_plan(str(p.get("intent", "")), str(p.get("root", ".")),
+                                 root, name=str(p.get("name", "demo"))))
+    local.add(ToolDef("do.run", "Plan + verify intent via the loop", level=2),
+              lambda p: _do_run(str(p.get("intent", "")), str(p.get("root", ".")),
+                                root, name=str(p.get("name", "demo")),
+                                execute=True,
+                                max_attempts=int(p.get("attempts", 3))))
+    reg.add_module(ModuleDef("loop", "Self-healing loop", "0.1.0",
+                             ["loop.run", "do.plan", "do.run"]))
+
+
+def _wire_quality(reg, local) -> None:
+    """Unified quality dashboard + trend + regression gate."""
+    from pathlib import Path as _P
+    from ..core.registry import ToolDef
+    from .. import quality as _q
+    root = str(_P(__file__).resolve().parents[3])
+    local.add(ToolDef("quality.report", "Quality snapshot + trend", level=0),
+              lambda p: _q.check(str(p.get("root", ".")), root,
+                                 min_score=p.get("min_score"),
+                                 max_regression=p.get("max_regression"),
+                                 run_pipe=bool(p.get("pipe")), save=False))
+    reg.add_module(ModuleDef("quality", "Quality dashboard", "0.1.0",
+                             ["quality.report"]))
 
 
 def _wire_ui(reg, local) -> None:

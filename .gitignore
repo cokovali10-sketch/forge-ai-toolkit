@@ -12,6 +12,7 @@ venv/
 lab-runs/
 lab-servers/
 *.forgebak
+quality-history/
 .forge-pipe-checkpoint.json
 .forge-pipe-history.jsonl
 forge-pipe-report.json

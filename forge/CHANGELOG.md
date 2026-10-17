@@ -1,6 +1,16 @@
 # Changelog
 
 ## Unreleased
+- loop: `forge loop <dir>` closes the conveyor into a self-healing loop —
+  safety checkpoint -> pipe -> repair bundles -> safe fixes (or `--on-fail`
+  hook) -> retry up to N attempts; `SUCCESS` only when truly green
+  (CLI + MCP `loop.run`)
+- do: `forge do "<intent>"` orchestrator — routes generator / modules / skills
+  / knowledge into an executable plan; `--run` verifies immediately
+  (CLI + MCP `do.plan` / `do.run`)
+- quality: `forge quality <dir>` dashboard — health score, issues by kind,
+  languages, recorded history + trend, and a CI gate (`--min-score`,
+  `--max-regression`) (CLI + MCP `quality.report`)
 - gen: web landing, python-service, go-cli (each self-validated, CLI+MCP),
   paper stays as the small Minecraft workshop
 - make: `forge make <kind> <name>` = generator + conveyor check in one shot

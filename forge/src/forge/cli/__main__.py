@@ -610,6 +610,92 @@ def _make(args: list[str]) -> int:
     return 0
 
 
+def _quality(args: list[str]) -> int:
+    """forge quality <dir> [--min-score N] [--max-regression N] [--pipe] [--json]."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge import quality
+    if not args or args[0] in ("-h", "--help", "help"):
+        print("usage: forge quality <dir> [--min-score N] [--max-regression N] "
+              "[--pipe] [--json]")
+        print("  сводный дашборд качества + тренд + регресс-гейт для CI")
+        return 0
+    root = args[0]
+    min_score = float(_flag(args, "--min-score")) if _flag(args, "--min-score") else None
+    max_reg = float(_flag(args, "--max-regression")) if _flag(args, "--max-regression") else None
+    out = quality.check(root, str(ROOT), min_score=min_score,
+                        max_regression=max_reg, run_pipe="--pipe" in args)
+    if "--json" in args:
+        print(_json.dumps(out, ensure_ascii=False, indent=2))
+        return 0 if out["ok"] else 1
+    arrow = {"up": "+", "down": "-", "flat": "="}[out["trend"]["direction"]]
+    print(f"качество: {out['score']:.0f}/100  тренд {arrow} {out['trend']['delta']:+.0f} "
+          f"(замеров: {out['trend']['samples']})")
+    print(f"файлов: {out['files']}  замечаний: {out['issues']}")
+    if out["langs"]:
+        print("языки: " + ", ".join(f"{k}:{v}" for k, v in
+                                    sorted(out["langs"].items(), key=lambda kv: -kv[1])))
+    if out["by_kind"]:
+        print("типы: " + ", ".join(f"{k}={v}" for k, v in list(out["by_kind"].items())[:6]))
+    if "pipe" in out:
+        print(f"конвейер: {out['pipe']}")
+    if out["ok"]:
+        print("гейт: ПРОЙДЕН")
+    else:
+        print("гейт: ПРОВАЛ — " + "; ".join(out["reasons"]))
+    return 0 if out["ok"] else 1
+
+
+def _do(args: list[str]) -> int:
+    """forge do "<намерение>" [--root DIR] [--name N] [--run] [--json]."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.orchestrate import run as _orun
+    if not args or args[0] in ("-h", "--help", "help"):
+        print('usage: forge do "<намерение>" [--root DIR] [--name N] [--run] [--json]')
+        print("  строит исполнимый план: цех, модули, скиллы, знания, проверка")
+        print("  --run — сразу прогнать замкнутый контур loop и дать вердикт")
+        return 0
+    positional = [a for a in args if not a.startswith("--")]
+    # значение флага --root/--name не должно попасть в намерение
+    flags_with_value = {"--root", "--name", "--attempts"}
+    intent_parts: list[str] = []
+    skip = False
+    for a in args:
+        if skip:
+            skip = False
+            continue
+        if a in flags_with_value:
+            skip = True
+            continue
+        if a.startswith("--"):
+            continue
+        intent_parts.append(a)
+    intent = " ".join(intent_parts).strip()
+    root = _flag(args, "--root") or "."
+    name = _flag(args, "--name") or "demo"
+    out = _orun(intent, root, str(ROOT), name=name, execute="--run" in args)
+    if "--json" in args:
+        print(_json.dumps(out, ensure_ascii=False, indent=2))
+    else:
+        print(f"намерение: {intent}")
+        if out.get("generator"):
+            print(f"цех: {out['generator']}")
+        if out.get("modules"):
+            print("модули: " + ", ".join(m["module"] for m in out["modules"]))
+        if out.get("skills"):
+            print("скиллы: " + ", ".join(s["skill"] for s in out["skills"]))
+        if out.get("knowledge"):
+            print("знания: " + ", ".join(str(k.get("title")) for k in out["knowledge"]))
+        print("план:")
+        for i, s in enumerate(out["steps"], 1):
+            print(f"  {i}. {s['step']}: {s['command']}")
+        if "verify" in out:
+            v = out["verify"]
+            print(f"проверка: {v['status']} за {len(v['attempts'])} попыток")
+    return 0
+
+
 def _loop(args: list[str]) -> int:
     """forge loop <dir> [--attempts N] [--on-fail "cmd"] [--no-autofix] [--serial]."""
     import json as _json
@@ -942,6 +1028,10 @@ def main(argv: list[str] | None = None) -> int:
         return _pipe(args[1:])
     if cmd == "loop":
         return _loop(args[1:])
+    if cmd == "do":
+        return _do(args[1:])
+    if cmd == "quality":
+        return _quality(args[1:])
     if cmd == "docs":
         return _docs(args[1:])
     if cmd == "bench":

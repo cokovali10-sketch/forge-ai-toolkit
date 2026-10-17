@@ -22,10 +22,11 @@ no paid APIs, no hallucinated results — only verifiable tools.*
 5. [Instructions for AI agents](#instructions-for-ai-agents)
 6. [Command reference](#command-reference)
 7. [The `refactor` advisor (clean code)](#the-refactor-advisor-clean-code)
-8. [The `pipe` conveyor in detail](#the-pipe-conveyor-in-detail)
-9. [Safety](#safety)
-10. [FAQ](#faq)
-11. [Status and roadmap](#status-and-roadmap)
+8. [Autopilot: `do`, `loop`, `quality`](#autopilot-do-loop-quality)
+9. [The `pipe` conveyor in detail](#the-pipe-conveyor-in-detail)
+10. [Safety](#safety)
+11. [FAQ](#faq)
+12. [Status and roadmap](#status-and-roadmap)
 
 ---
 
@@ -137,6 +138,9 @@ builds and writes — 2. The client decides what the agent may do.
 | `forge gen web/python-service/go-cli/paper` | project generators (landing, microservice, Go CLI, Paper plugin) |
 | `forge make <kind> <name> [out]` | generator + conveyor check in one shot |
 | `forge refactor <file\|dir>` | clean-code advisor: long functions, nesting, duplicates, magic numbers |
+| `forge do "<intent>"` | orchestrator: generator, modules, skills, knowledge, plan, verify |
+| `forge loop <dir>` | closed loop: conveyor → repair bundles → safe fixes → retry |
+| `forge quality <dir>` | quality dashboard + trend + regression gate for CI |
 | `forge know ... / know mine` | knowledge base + miner (manual only!) |
 | `forge ui brief/pack` | design briefs and resource packs |
 | `forge fix rollback` | roll back to the checkpoint |
@@ -162,6 +166,32 @@ forge refactor app.py --apply --test "pytest -q"
 a syntax check, your tests, and **automatic rollback** if anything fails.
 For agents: `refactor.inspect`, `refactor.plan`, `refactor.sarif`,
 `refactor.apply`. Skill: `refactor-expert`.
+
+## Autopilot: `do`, `loop`, `quality`
+
+Three commands that close the conveyor into a loop.
+
+- `forge do "<intent>"` — the orchestrator. Parses the intent, picks a
+  generator (`web`, `python-service`, `go-cli`, `paper`), modules, skills and
+  knowledge, and emits an executable plan: what to generate, inspect and
+  verify. With `--run` it also verifies immediately.
+- `forge loop <dir>` — repairs itself. Takes a safety checkpoint, runs the
+  conveyor; if red, builds repair bundles, applies safe fixes (or your
+  `--on-fail "command"`) and retries up to `--attempts` (default 3). Returns
+  `SUCCESS` only when truly green.
+- `forge quality <dir>` — one screen of truth: health score, issues by kind,
+  languages, trend over recorded snapshots and a gate. `--min-score 80` fails
+  CI when quality drops below; `--max-regression 2` fails on a drop of more
+  than 2 points.
+
+```bat
+forge do "build a landing page for a coffee shop" --root .
+forge do "fix the project" --root . --run
+forge loop . --attempts 3
+forge quality . --min-score 80 --max-regression 2
+```
+
+For agents: `do.plan`, `do.run`, `loop.run`, `quality.report`.
 
 ## The `pipe` conveyor in detail
 
@@ -194,7 +224,7 @@ reason (`.forge-suppress.json`), line-level via `# forge-ignore`.
 ## Status and roadmap
 
 Now: core, conveyor, lab, 5 languages, editor, generators + `make`, the
-`refactor` advisor, 110 green tests.
+`refactor` advisor, the `do`/`loop`/`quality` autopilot, 132 green tests.
 Honestly not done: desktop app (needs Node for Tauri), GUI screenshots,
 auto-client — marked `NOT_IMPLEMENTED`.
 Next: project generators (web/Python/Go), first arena entry, PyPI release.
