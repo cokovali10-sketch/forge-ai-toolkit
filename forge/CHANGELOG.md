@@ -8,6 +8,9 @@
 - refactor: clean-code advisor (`forge refactor`, MCP `refactor.inspect`) —
   long functions, deep nesting, duplicate blocks, magic numbers, too many args,
   God-classes; structure-only, never changes behavior
+- pipe: new advisory stage `clean-code` (6/7, allow_fail) surfaces a refactor
+  plan each run; skill `refactor-expert` gives agents the safe recipe
+- docs: conveyor is now 7 stages (clean-code before lab-e2e)
 - evolve: Self-Update detector (stale skills/rules/history/toolchains),
   `forge evolve` CLI + `evolve.check` MCP
 - edit: universal object editor (JSON engine + YAML via Anvil, lite-schemas,

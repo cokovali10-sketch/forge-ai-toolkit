@@ -21,10 +21,11 @@ no paid APIs, no hallucinated results — only verifiable tools.*
 4. [Connecting an AI agent (MCP)](#connecting-an-ai-agent-mcp)
 5. [Instructions for AI agents](#instructions-for-ai-agents)
 6. [Command reference](#command-reference)
-7. [The `pipe` conveyor in detail](#the-pipe-conveyor-in-detail)
-8. [Safety](#safety)
-9. [FAQ](#faq)
-10. [Status and roadmap](#status-and-roadmap)
+7. [The `refactor` advisor (clean code)](#the-refactor-advisor-clean-code)
+8. [The `pipe` conveyor in detail](#the-pipe-conveyor-in-detail)
+9. [Safety](#safety)
+10. [FAQ](#faq)
+11. [Status and roadmap](#status-and-roadmap)
 
 ---
 
@@ -65,7 +66,7 @@ Done when tests are green. Next — see the arsenal:
 :: 1. What project is in front of you
 .venv\Scripts\python -m forge.cli inspect D:/my-project
 
-:: 2. Full conveyor: inspect -> review -> skills -> knowledge -> langs
+:: 2. Full conveyor: inspect -> review -> skills -> knowledge -> langs -> clean-code
 .venv\Scripts\python -m forge.cli pipe run D:/my-project
 
 :: 3. Same, but with a window, buttons and history
@@ -151,7 +152,8 @@ recommends structure, never changes behavior. For agents: `refactor.inspect`.
 
 ## The `pipe` conveyor in detail
 
-6 stages: inspect → review → skills → knowledge → langs → (optional `lab-e2e`
+7 stages: inspect → review → skills → knowledge → langs → clean-code →
+(optional `lab-e2e`
 via `--heavy`). Fast stages run in parallel (`--serial` restores the queue),
 the heavy one strictly after and only on green. Repeat runs reuse the
 checkpoint cache by content hashes. `--changed` checks only git-changed files
@@ -178,7 +180,8 @@ reason (`.forge-suppress.json`), line-level via `# forge-ignore`.
 
 ## Status and roadmap
 
-Now: core, conveyor, lab, 5 languages, editor, 99 green tests.
+Now: core, conveyor, lab, 5 languages, editor, generators + `make`, the
+`refactor` advisor, 110 green tests.
 Honestly not done: desktop app (needs Node for Tauri), GUI screenshots,
 auto-client — marked `NOT_IMPLEMENTED`.
 Next: project generators (web/Python/Go), first arena entry, PyPI release.

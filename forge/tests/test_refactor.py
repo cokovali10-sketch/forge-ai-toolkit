@@ -70,3 +70,17 @@ def test_api_dir_and_cli(tmp_path):
     assert res["total_issues"] > 0
     assert main(["refactor", str(tmp_path)]) == 0
     assert main(["refactor", str(tmp_path / "nope.py")]) == 1
+
+
+def test_pipe_clean_code_stage(tmp_path):
+    from forge.pipe.runner import PipeRunner
+    from forge.pipe.stages import DEFAULT_STAGES
+    (tmp_path / "bad.py").write_text(_long_function(), encoding="utf-8")
+    stage = [s for s in DEFAULT_STAGES if s.name == "clean-code"]
+    assert stage, "clean-code stage must be in the default conveyor"
+    r = PipeRunner(stage, {"target": str(tmp_path),
+                           "forge_root": "D:/Forge-Factority/forge"}).run()
+    assert r.status == "SUCCESS"  # advisory: never fails
+    warns = r.stages[0].get("warnings", [])
+    assert any("чистый код" in w for w in warns)
+

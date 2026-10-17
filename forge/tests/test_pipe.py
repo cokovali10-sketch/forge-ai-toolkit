@@ -124,7 +124,7 @@ def test_mcp_pipe_tools(tmp_path):
     names = sorted(reg.tool_owner)
     assert "pipe.stages" in names and "pipe.run" in names and "pipe.status" in names
     lst = reg.call("pipe.stages", {})
-    assert [s["name"] for s in lst["data"]["stages"]] == ["inspect", "review", "skills", "knowledge", "langs", "lab-e2e"]
+    assert [s["name"] for s in lst["data"]["stages"]] == ["inspect", "review", "skills", "knowledge", "langs", "clean-code", "lab-e2e"]
     rep = reg.call("pipe.run", {"root": str(tmp_path), "only": "inspect"})
     assert rep["data"]["status"] == "SUCCESS"
     assert [s["name"] for s in rep["data"]["stages"]] == ["inspect"]
