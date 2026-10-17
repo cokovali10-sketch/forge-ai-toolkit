@@ -438,6 +438,21 @@ def _know_mine(args: list[str]) -> int:
     return 0
 
 
+def _refactor(args: list[str]) -> int:
+    """forge refactor <file|dir> — найти проблемы чистого кода."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.refactor import api as _api
+    if not args or args[0] in ("-h", "--help", "help"):
+        print("usage: forge refactor <file|dir>")
+        print("находит длинные функции, глубокую вложенность, дубли, магические числа, God-классы")
+        return 0
+    target = args[0]
+    res = _api.inspect(target)
+    print(_json.dumps(res, ensure_ascii=False, indent=2))
+    return 0 if res.get("ok", True) else 1
+
+
 def _lang(args: list[str]) -> int:
     """forge lang detect <dir> | lint|test <id> [dir] | scaffold <id> <name> <out>."""
     import json as _json
@@ -532,6 +547,24 @@ def _evolve(args: list[str]) -> int:
                   f"-> {','.join(t['suggest'])}")
         if not out["tasks"]:
             print("  всё свежо, задач нет")
+    return 0
+
+
+def _make(args: list[str]) -> int:
+    """forge make <web|python-service|go-cli> <name> [out-dir]: скаффолд + проверка."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    if not args or args[0] in ("-h", "--help", "help") or len(args) < 2:
+        print("usage: forge make <web|python-service|go-cli> <name> [out-dir]")
+        return 0 if args and args[0] in ("-h", "--help", "help") else 2
+    from forge.gen.make import make as _mk
+    out = _mk(args[0], args[1], args[2] if len(args) > 2 else ".", str(ROOT))
+    if not out.get("ok"):
+        print(_json.dumps(out, ensure_ascii=False, indent=2))
+        return 1
+    print(f"make {args[0]}/{args[1]}: скаффолд OK, проверка: {out['pipe']}")
+    for name, status in out["stages"]:
+        print(f"  {'OK ' if status == 'SUCCESS' else 'FAIL'} {name}")
     return 0
 
 
@@ -811,10 +844,14 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if cmd == "lab":
         return _lab(args[1:])
+    if cmd == "make":
+        return _make(args[1:])
     if cmd == "evolve":
         return _evolve(args[1:])
     if cmd == "edit":
         return _edit(args[1:])
+    if cmd == "refactor":
+        return _refactor(args[1:])
     if cmd == "lang":
         return _lang(args[1:])
     if cmd == "pipe":

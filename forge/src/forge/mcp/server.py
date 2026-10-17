@@ -113,6 +113,7 @@ def build_default_registry(anvil_dir: str = "") -> Registry:
     _wire_langs(reg, local)
     _wire_edit(reg, local)
     _wire_evolve(reg, local)
+    _wire_refactor(reg, local)
     _wire_pipe(reg, local)
     _wire_more(reg, local, anvil_dir)
     if anvil_dir and Path(anvil_dir, "anvil_call.py").is_file():
@@ -208,6 +209,16 @@ def _wire_evolve(reg, local) -> None:
                              ["evolve.check"]))
 
 
+def _wire_refactor(reg, local) -> None:
+    """Refactor advisor: find clean-code problems in a file/dir."""
+    from ..core.registry import ToolDef
+    from ..refactor import api as _api
+    local.add(ToolDef("refactor.inspect", "Find clean-code problems in a file/dir", level=0),
+              lambda p: _api.inspect(str(p.get("path", ""))))
+    reg.add_module(ModuleDef("refactor", "Clean-code advisor", "0.1.0",
+                             ["refactor.inspect"]))
+
+
 def _wire_gen(reg, local) -> None:
     """Project generators: web landing, python service, go cli, paper plugin."""
     from ..core.registry import ToolDef
@@ -233,6 +244,18 @@ def _wire_gen(reg, local) -> None:
     reg.add_module(ModuleDef("gen", "Project generators", "0.1.0",
                              ["gen.web", "gen.python_service",
                               "gen.go_cli", "gen.paper"]))
+    local.add(ToolDef("make.project", "Scaffold + verify project", level=2),
+              lambda p: _make_project(p))
+    reg.add_module(ModuleDef("make", "Project stamping", "0.1.0",
+                             ["make.project"]))
+
+
+def _make_project(p: dict) -> dict:
+    from ..gen.make import make as _mk
+    from pathlib import Path as _P
+    return _mk(str(p.get("kind", "")), str(p.get("name", "demo")),
+               str(p.get("out", ".")),
+               str(_P(__file__).resolve().parents[3]))
 
 
 def _wire_ui(reg, local) -> None:

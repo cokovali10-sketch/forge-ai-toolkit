@@ -3,6 +3,11 @@
 ## Unreleased
 - gen: web landing, python-service, go-cli (each self-validated, CLI+MCP),
   paper stays as the small Minecraft workshop
+- make: `forge make <kind> <name>` = generator + conveyor check in one shot
+  (CLI + MCP `make.project`)
+- refactor: clean-code advisor (`forge refactor`, MCP `refactor.inspect`) —
+  long functions, deep nesting, duplicate blocks, magic numbers, too many args,
+  God-classes; structure-only, never changes behavior
 - evolve: Self-Update detector (stale skills/rules/history/toolchains),
   `forge evolve` CLI + `evolve.check` MCP
 - edit: universal object editor (JSON engine + YAML via Anvil, lite-schemas,

@@ -133,11 +133,21 @@ builds and writes — 2. The client decides what the agent may do.
 | `forge lang detect/lint/test/scaffold` | 5 language experts (python/js/rust/cpp/go) |
 | `forge edit inspect/get/set/validate/rollback` | object editor (native JSON, YAML via Anvil) |
 | `forge evolve` | what is stale and who should fix it |
-| `forge gen paper` | Paper plugin generator |
+| `forge gen web/python-service/go-cli/paper` | project generators (landing, microservice, Go CLI, Paper plugin) |
+| `forge make <kind> <name> [out]` | generator + conveyor check in one shot |
+| `forge refactor <file\|dir>` | clean-code advisor: long functions, nesting, duplicates, magic numbers |
 | `forge know ... / know mine` | knowledge base + miner (manual only!) |
 | `forge ui brief/pack` | design briefs and resource packs |
 | `forge fix rollback` | roll back to the checkpoint |
 | `forge docs` | regenerate tool catalogs |
+
+## The `refactor` advisor (clean code)
+
+`forge refactor <file|dir>` finds what makes code hard to read — long
+functions (>50 lines), deep nesting (>3), duplicated blocks (3+ lines), magic
+numbers, functions with too many args, God-classes (>200 lines) — and gives a
+concrete "extract / guard-clause / named constant" suggestion for each. It only
+recommends structure, never changes behavior. For agents: `refactor.inspect`.
 
 ## The `pipe` conveyor in detail
 
