@@ -147,6 +147,7 @@ builds and writes — 2. The client decides what the agent may do.
 | `forge init [dir]` | onboard a project: CI + suppress stub, no overwrite |
 | `forge report [dir]` | one consolidated report: audit + trend + pipe + env |
 | `forge serve [dir]` | local dashboard + JSON API for the project |
+| `forge baseline save\|check` | hold the line: fail only on NEW findings |
 | `forge refactor <file\|dir>` | clean-code advisor: long functions, nesting, duplicates, magic numbers |
 | `forge do "<intent>"` | orchestrator: generator, modules, skills, knowledge, plan, verify |
 | `forge loop <dir>` | closed loop: conveyor → repair bundles → safe fixes → retry |
@@ -269,6 +270,27 @@ forge serve . --watch 30  :: rebuild the report in the background every 30s
 API: `GET /api/report[?deep=1]` — the full report; `GET /api/health` — score
 and verdict. Agents get it in one call via `report.full`.
 
+Export to a file: `forge report . --html report.html` — a standalone HTML page
+(the same dashboard, data embedded; handy to attach to a PR).
+
+## Hold the line: `forge baseline`
+
+On a large legacy codebase the audit immediately shows hundreds of findings, so
+an honest `--min-score` gate is impossible to raise. `baseline` fixes that: a
+snapshot of today's findings, then failing **only on new ones**. Fingerprints
+are stable across line shifts.
+
+```bat
+forge baseline save .                       :: snapshot (.forge-baseline.json)
+forge baseline check . --fail-on high       :: fail only on new high findings
+forge baseline check . --fail-on medium --json
+forge baseline diff .                       :: what is new / what got fixed
+forge audit . --baseline                    :: audit + baseline gate
+```
+
+In CI: `forge baseline check . --fail-on high` — red only if you introduced a
+**new** serious problem. For agents: `baseline.save`, `baseline.check`.
+
 ## The `pipe` conveyor in detail
 
 8 stages: inspect → secrets → review → skills → knowledge → langs → clean-code
@@ -304,7 +326,7 @@ reason (`.forge-suppress.json`), line-level via `# forge-ignore`.
 Now: core, conveyor (8 stages), lab, 5 languages, editor, generators (`web`,
 `python-service`, `go-cli`, `node-api`, `rust-cli`, `paper`) + `make`, the
 `map`/`test`/`ci`/`secrets`/`deps`/`doctor` arsenal, the `refactor` advisor, the
-`do`/`loop`/`quality` autopilot, a first arena entry (reference 3/3), 182 green
+`do`/`loop`/`quality` autopilot, a first arena entry (reference 3/3), 190 green
 tests.
 Honestly not done: desktop app (needs Rust for Tauri - no cargo on this machine),
 GUI screenshots, auto-client — marked `NOT_IMPLEMENTED`.

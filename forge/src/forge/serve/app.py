@@ -161,17 +161,23 @@ function vEnv(a,sec,D){
   return h;
 }
 async function load(){
-  try{const r=await fetch("api/report?t="+Date.now());DATA=await r.json();
+  try{
+    let d=window.__FORGE_DATA__;
+    if(!d){const r=await fetch("api/report?t="+Date.now());d=await r.json();}
+    DATA=d;
     $("score").textContent=(DATA.score??"--");
     $("verdict").textContent=DATA.verdict||"--";
     $("path").textContent=DATA.root||"";
     $("foot").textContent="обновлено: "+(DATA.generated_at||"?")+
-      " · только чтение · forge serve";render();
+      (window.__FORGE_DATA__?" · статический отчёт (экспорт)":
+       " · только чтение · forge serve");render();
   }catch(e){$("foot").textContent="ошибка связи: "+e;}
 }
-$("auto").addEventListener("change",()=>{if($("auto").checked)load();});
 tabs();load();
-setInterval(()=>{if($("auto").checked)load();},15000);
+if(!window.__FORGE_DATA__){
+  $("auto").addEventListener("change",()=>{if($("auto").checked)load();});
+  setInterval(()=>{if($("auto").checked)load();},15000);
+}else{$("auto").parentElement.style.display="none";}
 </script></body></html>"""
 
 _cache: dict = {"at": 0.0, "root": None, "data": None}
@@ -227,6 +233,14 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(PAGE.encode(), "text/html")
             return
         self._send(b'{"ok":false,"error":"not found"}', "application/json", 404)
+
+
+def render_static(report: dict) -> str:
+    """Тот же дашборд, но одним автономным HTML-файлом (данные внутри)."""
+    payload = (json.dumps(report, ensure_ascii=False)
+               .replace("</", "<\\/").replace("<!--", "<\\!--"))
+    inject = f"<script>window.__FORGE_DATA__={payload};</script>"
+    return PAGE.replace("<script>", inject + "<script>", 1)
 
 
 def serve(root: str, port: int = 8099, open_browser: bool = False,

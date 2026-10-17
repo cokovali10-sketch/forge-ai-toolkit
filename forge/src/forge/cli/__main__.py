@@ -580,7 +580,8 @@ def _flag(args: list[str], name: str) -> str:
     return ""
 
 
-_VALUE_FLAGS = {"--timeout", "--max-files", "--min-score", "--max-regression"}
+_VALUE_FLAGS = {"--timeout", "--max-files", "--min-score", "--max-regression",
+                "--path", "--fail-on", "--baseline", "--html"}
 
 
 def _positionals(args: list[str]) -> list[str]:
@@ -715,6 +716,15 @@ def _audit(args: list[str]) -> int:
         if out.get("score", 0) < threshold:
             print(f"audit: {out.get('score')} < {threshold} — гейт не пройден")
             return 1
+    bl_path = _flag(args, "--baseline")
+    if "--baseline" in args:
+        from forge.kit import baseline as bl
+        bres = bl.check(pos[0] if pos else ".", bl_path or None,
+                        fail_on=_flag(args, "--fail-on") or "high")
+        if "--json" not in args:
+            print(bl.render_text(bres))
+        if bres.get("ok") is False and not bres.get("baseline_missing"):
+            return 1
     return 0 if out.get("ok") else 1
 
 
@@ -797,10 +807,22 @@ def _report(args: list[str]) -> int:
     sys.path.insert(0, str(ROOT / "src"))
     from forge.kit import full_report, render_report
     if args and args[0] in ("-h", "--help", "help"):
-        print("usage: forge report [dir] [--deep] [--json]")
+        print("usage: forge report [dir] [--deep] [--json] [--html FILE]")
         return 0
     pos = _positionals(args)
     rep = full_report(pos[0] if pos else ".", deep="--deep" in args)
+    html_path = _flag(args, "--html")
+    if html_path:
+        from pathlib import Path as _P
+        from forge.serve import render_static
+        out = _P(html_path)
+        try:
+            out.write_text(render_static(rep), encoding="utf-8")
+        except OSError as e:
+            print(f"report: не записать {out}: {e}")
+            return 1
+        print(f"report: HTML -> {out}")
+        return 0 if rep.get("ok") else 1
     if "--json" in args:
         print(_json.dumps(rep, ensure_ascii=False, indent=2))
         return 0 if rep.get("ok") else 1
@@ -820,6 +842,66 @@ def _serve(args: list[str]) -> int:
     port = int(_flag(args, "--port") or 8099)
     watch = float(_flag(args, "--watch") or 0)
     return serve(root, port=port, open_browser="--open" in args, watch=watch)
+
+
+def _baseline(args: list[str]) -> int:
+    """forge baseline <save|check|diff> [dir] [--path P] [--fail-on L] [--json]."""
+    import json as _json
+    from pathlib import Path as _P
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.kit import baseline as bl
+    sub = args[0] if args else "check"
+    if sub in ("-h", "--help", "help") or sub not in ("save", "check", "diff"):
+        print("usage: forge baseline <save|check|diff> [dir] "
+              "[--path P] [--fail-on high|medium|low|none] [--json]")
+        print("  save  - снять снимок текущих проблем (по умолчанию")
+        print("          <dir>/.forge-baseline.json); check - падать только")
+        print("          на НОВЫХ проблемах; diff - что нового/закрыто")
+        return 0 if sub in ("-h", "--help", "help") else 2
+    rest = args[1:]
+    pos = _positionals(rest)
+    root = pos[0] if pos else "."
+    path = _flag(rest, "--path") or None
+
+    if sub == "save":
+        out = bl.save(root, path)
+        if "--json" in args:
+            print(_json.dumps(out, ensure_ascii=False, indent=2))
+            return 0 if out.get("ok") else 1
+        if not out.get("ok"):
+            print(f"baseline save: {out.get('error')}")
+            return 1
+        print(f"baseline save: {out['count']} проблем -> {out['path']}")
+        return 0
+
+    if sub == "check":
+        out = bl.check(root, path, fail_on=_flag(rest, "--fail-on") or "high")
+        if "--json" in args:
+            print(_json.dumps(out, ensure_ascii=False, indent=2))
+            return 0 if out.get("ok") else 1
+        print(bl.render_text(out))
+        return 0 if out.get("ok") else 1
+
+    snap = bl.collect(root)
+    if not snap.get("ok"):
+        print(f"baseline diff: {snap.get('error')}")
+        return 1
+    loaded = bl.load(path or str(_P(root) / bl.DEFAULT_NAME))
+    d = bl.diff(snap["items"], loaded["items"])
+    if "--json" in args:
+        print(_json.dumps({"new": d["new"], "resolved": d["resolved"],
+                           "new_counts": d["new_counts"]},
+                          ensure_ascii=False, indent=2))
+        return 0
+    c = d["new_counts"]
+    print(f"baseline diff: new={len(d['new'])} "
+          f"(high={c['high']} medium={c['medium']} low={c['low']}), "
+          f"resolved={len(d['resolved'])}, всего={d['current_count']}")
+    for i in d["new"][:20]:
+        print(f"  + [{i['severity']}] {i['area']}: {i['detail']} ({i['file']})")
+    for i in d["resolved"][:10]:
+        print(f"  - [{i['severity']}] {i['area']}: {i['detail']} ({i['file']})")
+    return 0
 
 
 def _evolve(args: list[str]) -> int:
@@ -1301,6 +1383,8 @@ def main(argv: list[str] | None = None) -> int:
         return _report(args[1:])
     if cmd == "serve":
         return _serve(args[1:])
+    if cmd == "baseline":
+        return _baseline(args[1:])
     if cmd == "docs":
         return _docs(args[1:])
     if cmd == "bench":

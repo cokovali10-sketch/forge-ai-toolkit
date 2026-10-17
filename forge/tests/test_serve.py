@@ -33,6 +33,18 @@ def test_full_report_missing_dir(tmp_path):
     assert rep["ok"] is False
 
 
+def test_report_html_export(tmp_path):
+    from forge.serve import render_static
+    from forge.cli.__main__ import main
+    html = render_static({"ok": True, "score": 90, "root": "x",
+                          "sections": {}})
+    assert "__FORGE_DATA__" in html and "FORGE" in html
+    root = _py_project(tmp_path)
+    out = tmp_path / "report.html"
+    assert main(["report", str(root), "--html", str(out)]) == 0
+    assert out.is_file() and "__FORGE_DATA__" in out.read_text(encoding="utf-8")
+
+
 def test_serve_endpoints(tmp_path):
     root = _py_project(tmp_path)
     _Handler.root = str(root)

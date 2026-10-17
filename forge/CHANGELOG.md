@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- kit: `forge baseline save|check|diff` (`baseline.save`/`baseline.check`) —
+  "hold the line": snapshot current findings, then fail only on NEW ones
+  (fingerprints stable across line shifts); `forge audit --baseline` gates too
+- serve: `forge report --html FILE` — a standalone offline dashboard page
 - serve: `forge serve [dir] [--port] [--open] [--watch]` — a single local
   read-only dashboard (health, quality trend, deps, secrets, pipe history,
   arena, environment) + JSON API (`/api/report`, `/api/health`); stdlib only

@@ -366,12 +366,22 @@ def _wire_kit(reg, local) -> None:
                       level=1),
               lambda p: _kit.full_report(str(p.get("root", ".")),
                                          deep=bool(p.get("deep"))))
+    local.add(ToolDef("baseline.save",
+                      "Snapshot current findings to .forge-baseline.json",
+                      level=1),
+              lambda p: _kit.baseline_save(str(p.get("root", "."))))
+    local.add(ToolDef("baseline.check",
+                      "Fail only on NEW findings vs the saved baseline",
+                      level=1),
+              lambda p: _kit.baseline_check(str(p.get("root", ".")),
+                                            fail_on=str(p.get("fail_on",
+                                                              "high"))))
     reg.add_module(ModuleDef("kit", "Project cannon: map/test/ci/secrets/doctor",
                              "0.1.0",
                              ["map.project", "test.detect", "test.run",
                               "ci.generate", "secrets.scan", "doctor.check",
                               "deps.scan", "audit.run", "init.project",
-                              "report.full"]))
+                              "report.full", "baseline.save", "baseline.check"]))
 
 
 def _wire_ui(reg, local) -> None:

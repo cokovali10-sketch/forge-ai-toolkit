@@ -1,10 +1,18 @@
 # Tool Catalog (generated — do not edit by hand)
 
-SOURCE_OF_TRUTH = registry (57 tools)
+SOURCE_OF_TRUTH = registry (59 tools)
 
 ## audit.run
 - module: kit, backend: local, level: 1
 - One-shot project health: map/secrets/deps/quality (+tests)
+
+## baseline.check
+- module: kit, backend: local, level: 1
+- Fail only on NEW findings vs the saved baseline
+
+## baseline.save
+- module: kit, backend: local, level: 1
+- Snapshot current findings to .forge-baseline.json
 
 ## ci.generate
 - module: kit, backend: local, level: 1
