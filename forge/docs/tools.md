@@ -1,6 +1,6 @@
 # Tool Catalog (generated — do not edit by hand)
 
-SOURCE_OF_TRUTH = registry (55 tools)
+SOURCE_OF_TRUTH = registry (56 tools)
 
 ## audit.run
 - module: kit, backend: local, level: 1
@@ -81,6 +81,10 @@ SOURCE_OF_TRUTH = registry (55 tools)
 ## gen.web
 - module: gen, backend: local, level: 1
 - Scaffold landing page
+
+## init.project
+- module: kit, backend: local, level: 1
+- Bootstrap FORGE into a project (CI + suppress stub)
 
 ## knowledge.get_fact
 - module: knowledge, backend: local, level: 0

@@ -762,6 +762,35 @@ def _doctor(args: list[str]) -> int:
     return 0 if out.get("ok") else 1
 
 
+def _init(args: list[str]) -> int:
+    """forge init [dir] [--force] [--json]: онбординг проекта для FORGE."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.kit import init_project
+    if args and args[0] in ("-h", "--help", "help"):
+        print("usage: forge init [dir] [--force] [--json]")
+        print("  создаёт недостающие файлы: CI (.github/workflows/forge-ci.yml)")
+        print("  и .forge-suppress.json; ничего не перезаписывает без --force")
+        return 0
+    pos = _positionals(args)
+    out = init_project(pos[0] if pos else ".", force="--force" in args)
+    if "--json" in args:
+        print(_json.dumps(out, ensure_ascii=False, indent=2))
+        return 0 if out.get("ok") else 1
+    if not out.get("ok"):
+        print(f"init: {out.get('error') or '; '.join(out.get('problems', []))}")
+        return 1
+    print(f"init: {out['root']}")
+    if out["created"]:
+        print("  создано: " + ", ".join(out["created"]))
+    if out["skipped"]:
+        print("  уже есть: " + ", ".join(out["skipped"]))
+    print("  дальше:")
+    for c in out["next"]:
+        print("    " + c)
+    return 0
+
+
 def _evolve(args: list[str]) -> int:
     """forge evolve [dir] [--json]: что протухло и кому чинить."""
     import json as _json
@@ -1235,6 +1264,8 @@ def main(argv: list[str] | None = None) -> int:
         return _deps(args[1:])
     if cmd == "audit":
         return _audit(args[1:])
+    if cmd == "init":
+        return _init(args[1:])
     if cmd == "docs":
         return _docs(args[1:])
     if cmd == "bench":

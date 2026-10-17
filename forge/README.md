@@ -4,7 +4,7 @@
 
 ### Внешний инструментарий для ИИ-агентов · External toolkit for AI agents
 
-[![tests](https://img.shields.io/badge/tests-178_passing-4ade80?style=for-the-badge)](#)
+[![tests](https://img.shields.io/badge/tests-179_passing-4ade80?style=for-the-badge)](#)
 [![python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](#)
 [![license](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](#)
 [![offline](https://img.shields.io/badge/offline-no_cloud-8b5cf6?style=for-the-badge)](#)

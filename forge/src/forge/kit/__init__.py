@@ -19,6 +19,7 @@ from forge.kit.ci import generate_ci
 from forge.kit.deps import scan_deps
 from forge.kit.doctor import doctor
 from forge.kit.doctor import render_text as render_doctor
+from forge.kit.init import init_project
 from forge.kit.project_map import build_map, render_text
 from forge.kit.secrets import scan_secrets
 from forge.kit.test_runner import detect_test_command, run_tests
@@ -26,5 +27,5 @@ from forge.kit.test_runner import detect_test_command, run_tests
 __all__ = [
     "build_map", "render_text", "detect_test_command", "run_tests",
     "generate_ci", "scan_secrets", "doctor", "render_doctor", "scan_deps",
-    "audit", "render_audit",
+    "audit", "render_audit", "init_project",
 ]

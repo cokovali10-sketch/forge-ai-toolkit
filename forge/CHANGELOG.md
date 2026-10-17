@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- kit: `forge init [dir]` (`init.project`) — onboards a project in one command:
+  writes the missing CI workflow and `.forge-suppress.json`, prints next steps;
+  never overwrites without `--force`
 - kit: `forge audit <dir>` (`audit.run`) — one-shot project health: composes the
   project map, secret scan, dependency hygiene and the code-quality score into a
   single 0..100 score (min over the worst area); `--deep` also runs the native

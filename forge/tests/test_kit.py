@@ -160,12 +160,32 @@ def test_cli_and_mcp_wired(tmp_path):
     assert main(["doctor", "--json"]) == 0
     assert main(["deps", str(tmp_path), "--json"]) == 0
     assert main(["audit", str(tmp_path), "--json"]) == 0
+    assert main(["init", str(tmp_path), "--json"]) == 0
     reg = build_default_registry("")
     for tool in ("map.project", "test.detect", "test.run", "ci.generate",
-                 "secrets.scan", "doctor.check", "deps.scan", "audit.run"):
+                 "secrets.scan", "doctor.check", "deps.scan", "audit.run",
+                 "init.project"):
         assert tool in reg.tool_owner, tool
     r = reg.call("map.project", {"root": str(tmp_path)})
     assert r["ok"] is True
+
+
+def test_init_creates_and_is_idempotent(tmp_path):
+    from forge.kit import init_project
+    _py_project(tmp_path)
+    out = init_project(tmp_path)
+    assert out["ok"] is True
+    assert (tmp_path / ".forge-suppress.json").is_file()
+    wf = tmp_path / ".github" / "workflows" / "forge-ci.yml"
+    assert wf.is_file()
+    assert ".forge-suppress.json" in out["created"]
+    assert "forge-ci.yml" in out["created"]
+    assert out["next"]
+    again = init_project(tmp_path)
+    assert again["ok"] is True and again["created"] == []
+    assert set(again["skipped"]) >= {".forge-suppress.json", "forge-ci.yml"}
+    out2 = init_project(tmp_path, force=True)
+    assert "forge-ci.yml" in out2["created"]
 
 
 def test_audit_scores_and_sections(tmp_path):
