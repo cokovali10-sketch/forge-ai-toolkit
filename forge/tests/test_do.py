@@ -33,3 +33,21 @@ def test_do_cli_and_mcp(tmp_path):
     r = reg.call("do.plan", {"intent": "сервис api", "root": str(p)})
     assert r["data"]["generator"] == "python-service"
     assert r["data"]["steps"]
+
+
+def test_skills_not_matched_on_generic_words(tmp_path):
+    from forge.orchestrate import plan
+    pl = plan("Хочу REST API сервис с базой данных и тестами", str(tmp_path),
+              "D:/Forge-Factority/forge")
+    assert pl["generator"] == "python-service"
+    assert all(s["domain"] != "minecraft" for s in pl["skills"])
+
+
+def test_skills_match_explicit_domain(tmp_path):
+    from forge.orchestrate import plan
+    root = "D:/Forge-Factority/forge"
+    mc = plan("сделай плагин для майнкрафта", str(tmp_path), root)
+    assert any(s["domain"] == "minecraft" for s in mc["skills"])
+    ref = plan("отрефактори код, слишком длинный и вложенный метод",
+               str(tmp_path), root)
+    assert any(s["domain"] == "clean-code" for s in ref["skills"])

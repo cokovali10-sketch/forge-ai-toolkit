@@ -226,7 +226,7 @@ reason (`.forge-suppress.json`), line-level via `# forge-ignore`.
 ## Status and roadmap
 
 Now: core, conveyor, lab, 5 languages, editor, generators + `make`, the
-`refactor` advisor, the `do`/`loop`/`quality` autopilot, 140 green tests.
+`refactor` advisor, the `do`/`loop`/`quality` autopilot, 142 green tests.
 Honestly not done: desktop app (needs Node for Tauri), GUI screenshots,
 auto-client — marked `NOT_IMPLEMENTED`.
 Next: project generators (web/Python/Go), first arena entry, PyPI release.

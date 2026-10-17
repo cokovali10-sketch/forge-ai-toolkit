@@ -26,10 +26,46 @@ GENERATORS: dict[str, list[str]] = {
               "bukkit"],
 }
 
+# Общие слова, которые сами по себе не должны «цеплять» скилл.
+_GENERIC = {
+    "api", "rest", "http", "code", "app", "data", "base", "database", "db",
+    "file", "files", "test", "tests", "task", "work", "input", "output",
+    "access", "release", "long", "read", "any", "that", "must", "when",
+    "before", "after", "every", "change", "mentions", "present", "project",
+    "using", "with", "from", "make", "write", "new", "add", "код",
+}
+
+# Русские синонимы домена -> домен скилла.
+_DOMAIN_SYNONYMS: dict[str, tuple[str, ...]] = {
+    "minecraft": ("майнкрафт", "майнкрафта", "paper", "spigot", "purpur",
+                  "bukkit", "плагин", "плагина"),
+    "java": ("java", "джава", "gradle", "maven", "junit"),
+    "design": ("gui", "дизайн", "интерфейс", "меню"),
+    "clean-code": ("рефактор", "рефакторинг", "чистый", "читаем", "дублиру"),
+    "security": ("безопасн", "аудит", "уязвим", "секрет", "утечк"),
+    "build": ("сборк", "собра", "компил", "билд"),
+}
+
+# Какие домены уместны для каждого цеха (лёгкий буст релевантности).
+_GENERATOR_DOMAINS: dict[str, tuple[str, ...]] = {
+    "web": ("design", "clean-code", "security"),
+    "python-service": ("clean-code", "security", "build"),
+    "go-cli": ("clean-code", "security", "build"),
+    "paper": ("minecraft", "java", "design", "security", "build", "clean-code"),
+}
+
 
 def _tokens(text: str) -> set[str]:
     import re
     return {t for t in re.split(r"[^\wа-яё]+", text.lower()) if len(t) > 2}
+
+
+def _domain_hit(domain: str, low: str) -> bool:
+    if not domain:
+        return False
+    if domain in low:
+        return True
+    return any(syn in low for syn in _DOMAIN_SYNONYMS.get(domain, ()))
 
 
 def _route_modules(intent: str, forge_root: str) -> list[dict[str, Any]]:
@@ -42,20 +78,28 @@ def _route_modules(intent: str, forge_root: str) -> list[dict[str, Any]]:
         return []
 
 
-def _match_skills(intent: str, forge_root: str) -> list[dict[str, Any]]:
+def _match_skills(intent: str, forge_root: str,
+                  generator: str = "") -> list[dict[str, Any]]:
     try:
         from forge.skills.loader import load_skills
         skills = load_skills(Path(forge_root) / "skills")
     except Exception:  # noqa: BLE001
         return []
-    want = _tokens(intent)
+    low = intent.lower()
+    want = _tokens(intent) - _GENERIC
+    allowed = _GENERATOR_DOMAINS.get(generator, ())
     scored: list[tuple[int, dict[str, Any]]] = []
     for s in skills.values():
-        hay = _tokens(" ".join([s.name, s.domain, s.title, " ".join(s.activates)]))
-        score = len(want & hay)
-        if s.domain and s.domain in intent.lower():
-            score += 2
-        if score:
+        hay = _tokens(" ".join([s.name, s.domain, s.title,
+                                " ".join(s.activates)])) - _GENERIC
+        overlap = len(want & hay)
+        hit = _domain_hit(s.domain, low)
+        score = overlap + (2 if hit else 0)
+        if generator and s.domain in allowed:
+            score += 1
+        # Нужна явная привязка к домену ИЛИ несколько совпадений, иначе одно
+        # общее слово («api» из «Bukkit API») тянет чуждый скилл (Minecraft).
+        if hit or overlap >= 2:
             scored.append((score, {"skill": s.name, "domain": s.domain,
                                    "title": s.title}))
     scored.sort(key=lambda kv: -kv[0])
@@ -94,9 +138,9 @@ def plan(intent: str, root: str, forge_root: str,
          name: str = "demo") -> dict[str, Any]:
     """Строит исполнимый план по намерению."""
     modules = _route_modules(intent, forge_root)
-    skills = _match_skills(intent, forge_root)
-    knowledge = _knowledge(intent, forge_root)
     kind = _detect_generator(intent)
+    skills = _match_skills(intent, forge_root, kind)
+    knowledge = _knowledge(intent, forge_root)
     steps: list[dict[str, Any]] = []
     if kind:
         steps.append({"step": "generate",

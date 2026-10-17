@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- do: skill routing no longer false-matches on generic words — a generic token
+  like `api` (from "Bukkit API") used to pull an unrelated Minecraft skill into
+  a REST-API intent; now `forge do` requires an explicit domain hit or several
+  real matches, understands Russian domain synonyms, and lightly prefers skills
+  that fit the detected generator
 - refactor: dead-code detection — unused imports (Python) as a finding, with a
   safe auto-fix (`--apply`) that removes them only when truly unreferenced
   (skips `# noqa`, star and multi-line imports, honours `__all__`/strings)
