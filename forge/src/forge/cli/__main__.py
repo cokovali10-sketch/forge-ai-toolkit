@@ -610,6 +610,48 @@ def _make(args: list[str]) -> int:
     return 0
 
 
+def _loop(args: list[str]) -> int:
+    """forge loop <dir> [--attempts N] [--on-fail "cmd"] [--no-autofix] [--serial]."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.pipe.loop import hook_command, run_loop
+    if not args or args[0] in ("-h", "--help", "help"):
+        print("usage: forge loop <dir> [--attempts N] [--on-fail \"cmd\"] [--no-autofix] [--serial]")
+        print("  гоняет конвейер и пытается довести проект до зелёного сам:")
+        print("  checkpoint -> pipe -> пакеты ремонта -> безопасные фиксы -> повтор")
+        return 0
+    target = args[0]
+    attempts = 3
+    if "--attempts" in args:
+        i = args.index("--attempts")
+        if i + 1 < len(args):
+            attempts = max(1, int(args[i + 1]))
+    hook = None
+    if "--on-fail" in args:
+        import shlex
+        i = args.index("--on-fail")
+        if i + 1 >= len(args):
+            print("нужна команда после --on-fail")
+            return 2
+        hook = hook_command(shlex.split(args[i + 1]), target)
+    out = run_loop(target, str(ROOT), max_attempts=attempts,
+                   serial="--serial" in args, auto_fix="--no-autofix" not in args,
+                   on_fail=hook)
+    if "--json" in args:
+        print(_json.dumps(out, ensure_ascii=False, indent=2))
+        return 0 if out["ok"] else 1
+    print(f"loop: {out['status']} за {len(out['attempts'])} попыток "
+          f"(страховка: {'да' if out['safety_net'] else 'нет'})")
+    for a in out["attempts"]:
+        acts = a.get("actions", [])
+        fixes = ", ".join(i.get("fix", i.get("hook", "?")) for i in acts)
+        print(f"  попытка {a['attempt']}: {a['status']}"
+              + (f" — действия: {fixes}" if fixes else ""))
+    if not out["ok"] and out.get("hint"):
+        print(f"  {out['hint']}")
+    return 0 if out["ok"] else 1
+
+
 def _pipe(args: list[str]) -> int:
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
@@ -898,6 +940,8 @@ def main(argv: list[str] | None = None) -> int:
         return _lang(args[1:])
     if cmd == "pipe":
         return _pipe(args[1:])
+    if cmd == "loop":
+        return _loop(args[1:])
     if cmd == "docs":
         return _docs(args[1:])
     if cmd == "bench":

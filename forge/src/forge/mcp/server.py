@@ -115,6 +115,7 @@ def build_default_registry(anvil_dir: str = "") -> Registry:
     _wire_evolve(reg, local)
     _wire_refactor(reg, local)
     _wire_pipe(reg, local)
+    _wire_loop(reg, local)
     _wire_more(reg, local, anvil_dir)
     if anvil_dir and Path(anvil_dir, "anvil_call.py").is_file():
         reg.add_backend("anvil", AnvilBackend(anvil_dir))
@@ -265,6 +266,20 @@ def _make_project(p: dict) -> dict:
     return _mk(str(p.get("kind", "")), str(p.get("name", "demo")),
                str(p.get("out", ".")),
                str(_P(__file__).resolve().parents[3]))
+
+
+def _wire_loop(reg, local) -> None:
+    """Self-healing loop: pipe -> bundles -> safe fixes -> retry."""
+    from pathlib import Path as _P
+    from ..core.registry import ToolDef
+    from ..pipe.loop import run_loop as _run_loop
+    root = str(_P(__file__).resolve().parents[3])
+    local.add(ToolDef("loop.run", "Run pipe and self-heal up to N attempts", level=2),
+              lambda p: _run_loop(str(p.get("root", ".")), root,
+                                  max_attempts=int(p.get("attempts", 3)),
+                                  serial=bool(p.get("serial")),
+                                  auto_fix=bool(p.get("auto_fix", True))))
+    reg.add_module(ModuleDef("loop", "Self-healing loop", "0.1.0", ["loop.run"]))
 
 
 def _wire_ui(reg, local) -> None:
