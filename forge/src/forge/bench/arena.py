@@ -65,7 +65,7 @@ def render(rows: list[dict[str, Any]]) -> str:
            "|---|---|---|---|"]
     for agent in sorted(latest):
         r = latest[agent]
-        det = ", ".join(f"{x['task']}:{'✓' if x['passed'] else '✗'}"
+        det = ", ".join(f"{x['task']}:{'PASS' if x['passed'] else 'FAIL'}"
                         for x in r.get("results", []))
         ts = _dt.datetime.fromtimestamp(r.get("ts", 0)).strftime("%Y-%m-%d %H:%M")
         out.append(f"| {agent} | {r.get('passed')}/{r.get('total')} | {ts} | {det} |")

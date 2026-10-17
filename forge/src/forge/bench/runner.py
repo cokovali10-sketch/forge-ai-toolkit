@@ -96,6 +96,8 @@ def check_javac(root: Path, spec: dict) -> CheckResult:
     javac = _os.path.expandvars(spec.get("javac", "javac"))
     javac = re.sub(r"\$([A-Za-z_][A-Za-z0-9_]*)",
                    lambda m: _os.environ.get(m.group(1), m.group(0)), javac)
+    if javac.startswith("$"):  # переменная не задана — падаем на javac из PATH
+        javac = "javac"
     if "/" not in javac.replace("\\", "/") and _sh.which(javac) is None:
         return CheckResult("javac", False, "SKIP: javac not on PATH",
                            int((time.time() - t) * 1000))
@@ -107,7 +109,7 @@ def check_javac(root: Path, spec: dict) -> CheckResult:
                "-d", tmp]
         if spec.get("classpath"):
             cmd += ["-cp", spec["classpath"]]
-        cmd += [str(f) for f in files]
+        cmd += [str(f.resolve()) for f in files]
         code, out = _run(cmd, root, int(spec.get("timeout", 300)))
     ok = code == 0
     return CheckResult("javac", ok, "" if ok else out[-600:],

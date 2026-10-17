@@ -1,6 +1,6 @@
 # Tool Catalog (generated — do not edit by hand)
 
-SOURCE_OF_TRUTH = registry (52 tools)
+SOURCE_OF_TRUTH = registry (54 tools)
 
 ## ci.generate
 - module: kit, backend: local, level: 1
@@ -10,6 +10,10 @@ SOURCE_OF_TRUTH = registry (52 tools)
 - module: quality, backend: local, level: 0
 - Static review: debt/dups/size
 
+## deps.scan
+- module: kit, backend: local, level: 0
+- Dependency inventory + hygiene for all ecosystems
+
 ## do.plan
 - module: loop, backend: local, level: 0
 - Turn an intent into an executable plan
@@ -17,6 +21,10 @@ SOURCE_OF_TRUTH = registry (52 tools)
 ## do.run
 - module: loop, backend: local, level: 2
 - Plan + verify intent via the loop
+
+## doctor.check
+- module: kit, backend: local, level: 0
+- Audit toolchains/versions and FORGE capabilities
 
 ## edit.get
 - module: edit, backend: local, level: 0

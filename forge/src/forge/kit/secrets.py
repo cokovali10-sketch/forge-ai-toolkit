@@ -52,6 +52,9 @@ _PLACEHOLDER = re.compile(
 
 MAX_BYTES = 2_000_000
 
+# Строка с этим маркером не считается утечкой (осознанные тестовые значения).
+ALLOW_MARKER = "forge:allow-secret"
+
 
 def _mask(value: str) -> str:
     value = value.strip()
@@ -68,6 +71,8 @@ def scan_text(text: str) -> list[dict[str, Any]]:
     """Сканирует один текст. Возвращает находки (с маскировкой)."""
     out: list[dict[str, Any]] = []
     for lineno, line in enumerate(text.splitlines(), 1):
+        if ALLOW_MARKER in line:
+            continue
         for kind, sev, rx in PATTERNS:
             for m in rx.finditer(line):
                 secret = m.group(1) if m.groups() else m.group(0)

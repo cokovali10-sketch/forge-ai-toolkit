@@ -1,0 +1,4 @@
+name: ClanCore
+version: 0.1.0
+main: com.forge.clans.ClanCore
+api-version: '1.21'

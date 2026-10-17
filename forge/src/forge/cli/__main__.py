@@ -690,6 +690,50 @@ def _secrets(args: list[str]) -> int:
     return 0 if out.get("ok") else 1
 
 
+def _deps(args: list[str]) -> int:
+    """forge deps <dir> [--check] [--json]: инвентарь зависимостей + гигиена."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.kit import scan_deps
+    if not args or args[0] in ("-h", "--help", "help"):
+        print("usage: forge deps <dir> [--check] [--json]")
+        print("  зависимости всех экосистем (python/node/go/rust/java) и гигиена:")
+        print("  неограниченные/свободные версии, дубликаты. --check — устаревшее.")
+        return 0
+    pos = _positionals(args)
+    out = scan_deps(pos[0] if pos else ".", check="--check" in args)
+    if "--json" in args:
+        print(_json.dumps(out, ensure_ascii=False, indent=2))
+        return 0 if out.get("ok") else 1
+    if not out.get("ok"):
+        print(f"deps: {out.get('error')}")
+        return 1
+    eco = ", ".join(f"{k}={v}" for k, v in out["by_ecosystem"].items()) or "нет"
+    print(f"зависимости: {out['count']} ({eco})")
+    for f in out["findings"][:20]:
+        print(f"  [{f['severity']}] {f['kind']}: {f['detail']} — {f['file']}")
+    return 0
+
+
+def _doctor(args: list[str]) -> int:
+    """forge doctor [dir] [--json]: аудит тулчейнов и возможностей."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.kit import doctor, render_doctor
+    if args and args[0] in ("-h", "--help", "help"):
+        print("usage: forge doctor [dir] [--json]")
+        print("  что есть на машине (тулчейны, версии) и что FORGE здесь умеет;")
+        print("  с путём — ещё стек тестов проекта. Только чтение.")
+        return 0
+    pos = _positionals(args)
+    out = doctor(pos[0] if pos else None)
+    if "--json" in args:
+        print(_json.dumps(out, ensure_ascii=False, indent=2))
+    else:
+        print(render_doctor(out))
+    return 0 if out.get("ok") else 1
+
+
 def _evolve(args: list[str]) -> int:
     """forge evolve [dir] [--json]: что протухло и кому чинить."""
     import json as _json
@@ -1157,6 +1201,10 @@ def main(argv: list[str] | None = None) -> int:
         return _ci(args[1:])
     if cmd == "secrets":
         return _secrets(args[1:])
+    if cmd == "doctor":
+        return _doctor(args[1:])
+    if cmd == "deps":
+        return _deps(args[1:])
     if cmd == "docs":
         return _docs(args[1:])
     if cmd == "bench":

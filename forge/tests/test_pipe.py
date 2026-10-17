@@ -148,7 +148,7 @@ def test_mcp_pipe_tools(tmp_path):
     names = sorted(reg.tool_owner)
     assert "pipe.stages" in names and "pipe.run" in names and "pipe.status" in names
     lst = reg.call("pipe.stages", {})
-    assert [s["name"] for s in lst["data"]["stages"]] == ["inspect", "review", "skills", "knowledge", "langs", "clean-code", "lab-e2e"]
+    assert [s["name"] for s in lst["data"]["stages"]] == ["inspect", "secrets", "review", "skills", "knowledge", "langs", "clean-code", "lab-e2e"]
     rep = reg.call("pipe.run", {"root": str(tmp_path), "only": "inspect"})
     assert rep["data"]["status"] == "SUCCESS"
     assert [s["name"] for s in rep["data"]["stages"]] == ["inspect"]
@@ -603,3 +603,18 @@ def test_evolve_detects_staleness(tmp_path):
     from forge.mcp.server import build_default_registry
     reg = build_default_registry("")
     assert "evolve.check" in reg.tool_owner
+
+
+def test_secrets_stage_high_fails_medium_warns(tmp_path):
+    from forge.pipe.stages import stage_secrets
+    (tmp_path / "k.py").write_text('x = "AKIAABCDEFGHIJKLMNOP"\n',
+                                   encoding="utf-8")
+    r = stage_secrets({"target": str(tmp_path)})
+    assert r.status == "FAILED" and r.result["count"] == 1
+    (tmp_path / "k.py").write_text('password = "hunter2secret"\n',
+                                   encoding="utf-8")
+    r2 = stage_secrets({"target": str(tmp_path)})
+    assert r2.status == "SUCCESS" and r2.warnings
+    (tmp_path / "k.py").write_text(
+        'aws = "AKIAABCDEFGHIJKLMNOP"  # forge:allow-secret\n', encoding="utf-8")
+    assert stage_secrets({"target": str(tmp_path)}).status == "SUCCESS"

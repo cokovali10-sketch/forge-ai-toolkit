@@ -282,24 +282,52 @@ def stage_clean_code(ctx: dict[str, Any]) -> ToolResult:
     return r
 
 
+def stage_secrets(ctx: dict[str, Any]) -> ToolResult:
+    """Утечки секретов: FAIL только на high (ключи/токены/приватные ключи).
+
+    Находки medium/low (напр. `password = "..."`) — предупреждение, не провал:
+    инструмент работает на любом чужом проекте и не должен валить из-за эвристики.
+    Полный секрет в отчёт не попадает — только маска. Строку с маркером
+    `forge:allow-secret` сканер пропускает.
+    """
+    from forge.kit.secrets import scan_secrets
+    res = timed(lambda: scan_secrets(ctx["target"]))
+    if not res.ok:
+        return res
+    data = res.result if isinstance(res.result, dict) else {}
+    findings = data.get("findings", []) if isinstance(data, dict) else []
+    high = [f for f in findings if f.get("severity") == "high"]
+    if high:
+        res.status = "FAILED"
+        res.error = {"message": f"{len(high)} секрет(ов) высокой важности",
+                     "sample": high[:5]}
+    elif findings:
+        res.warnings = [f"{len(findings)} потенциальных секрет(ов) "
+                        f"medium/low — `forge secrets .`"]
+    return res
+
+
 DEFAULT_STAGES: list[Stage] = [
-    Stage("inspect", "1/7 Осмотр проекта", stage_inspect, 60.0,
+    Stage("inspect", "1/8 Осмотр проекта", stage_inspect, 60.0,
           notes="структура, языки, сборка",
           fingerprint=lambda c: tree_hash(c["target"])),
-    Stage("review", "2/7 Ревью кода", stage_review, 180.0,
+    Stage("secrets", "2/8 Секреты (утечки)", stage_secrets, 120.0,
+          notes="high = FAIL, medium/low = предупреждение",
+          fingerprint=lambda c: tree_hash(c["target"])),
+    Stage("review", "3/8 Ревью кода", stage_review, 180.0,
           notes="confirmed = FAIL",
           fingerprint=lambda c: _review_fp(c)),
-    Stage("skills", "3/7 Проверка скиллов", stage_skills, 60.0,
+    Stage("skills", "4/8 Проверка скиллов", stage_skills, 60.0,
           notes="все скиллы должны валидироваться",
           fingerprint=lambda c: tree_hash(Path(c["forge_root"]) / "skills")),
-    Stage("knowledge", "4/7 База знаний", stage_knowledge, 60.0,
+    Stage("knowledge", "5/8 База знаний", stage_knowledge, 60.0,
           allow_fail=True, notes="предупреждает, не валит",
           fingerprint=lambda c: tree_hash(Path(c["forge_root"]) / "knowledge",
                                            {".jsonl"})),
-    Stage("langs", "5/7 Языки проекта", stage_langs, 600.0,
+    Stage("langs", "6/8 Языки проекта", stage_langs, 600.0,
           notes="lint найденных языков (python/js/rust/cpp/go)",
           fingerprint=lambda c: tree_hash(c["target"], LANG_EXTS)),
-    Stage("clean-code", "6/7 Чистый код", stage_clean_code, 120.0,
+    Stage("clean-code", "7/8 Чистый код", stage_clean_code, 120.0,
           allow_fail=True, notes="советник: длинные функции, вложенность, дубли",
           fingerprint=lambda c: tree_hash(c["target"], CODE_EXTS)),
 ]
@@ -339,7 +367,7 @@ def stage_lab_e2e(ctx: dict[str, Any]) -> ToolResult:
 
 
 HEAVY_STAGES: list[Stage] = [
-    Stage("lab-e2e", "7/7 Lab E2E (тяжёлая)", stage_lab_e2e, 1500.0,
+    Stage("lab-e2e", "8/8 Lab E2E (тяжёлая)", stage_lab_e2e, 1500.0,
           notes="Purpur + JDK21, минуты; только --heavy",
           fingerprint=lambda c: tree_hash(
               Path(c["forge_root"]) / "tests" / "fixture-plugin",

@@ -141,6 +141,8 @@ builds and writes — 2. The client decides what the agent may do.
 | `forge test <dir>` | universal test runner (pytest/npm/go/cargo/gradle/maven/make) |
 | `forge ci <dir>` | generate a GitHub Actions workflow for the detected stack |
 | `forge secrets <dir>` | secret-leak scan (keys/tokens/passwords, masked output) |
+| `forge deps <dir>` | dependency inventory + version hygiene (--check: outdated) |
+| `forge doctor [dir]` | audit toolchains/versions and FORGE capabilities here |
 | `forge refactor <file\|dir>` | clean-code advisor: long functions, nesting, duplicates, magic numbers |
 | `forge do "<intent>"` | orchestrator: generator, modules, skills, knowledge, plan, verify |
 | `forge loop <dir>` | closed loop: conveyor → repair bundles → safe fixes → retry |
@@ -199,9 +201,9 @@ forge quality . --min-score 80 --max-regression 2
 
 For agents: `do.plan`, `do.run`, `loop.run`, `quality.report`.
 
-## The `kit` arsenal: `map`, `test`, `ci`, `secrets`
+## The `kit` arsenal: `map`, `test`, `ci`, `secrets`, `deps`, `doctor`
 
-Four commands that turn FORGE into a cannon for any project.
+Six commands that turn FORGE into a cannon for any project.
 
 - `forge map <dir>` - instant map of unfamiliar code: languages and lines of
   code, build files, guessed entry points, largest files, the internal Python
@@ -216,23 +218,34 @@ Four commands that turn FORGE into a cannon for any project.
   without `--force`.
 - `forge secrets <dir>` - finds keys, tokens, private keys and passwords
   (AWS/GitHub/Google/Slack/Stripe/OpenAI, JWT, `password=...`). The full secret
-  **never** reaches the output - only a mask. Catch a leak before you publish.
+  **never** reaches the output - only a mask. A line marked with
+  `forge:allow-secret` is skipped.
+- `forge deps <dir>` - dependency inventory across ecosystems
+  (python/node/go/rust/java) plus hygiene: unbounded/loose versions,
+  duplicates. `--check` also asks the native tools about outdated packages.
+- `forge doctor [dir]` - audits the machine: which toolchains are present and
+  their versions, and what FORGE can really do here. With a path it also
+  reports the project's test stack. Read-only.
 
 ```bat
 forge map .                       :: project map
 forge test . --timeout 300        :: run the project's tests
 forge ci .                        :: generate CI
 forge secrets .                   :: check for leaks
+forge deps . --check              :: deps and outdated
+forge doctor .                    :: what is available, what to do
 ```
 
 For agents: `map.project`, `test.detect`, `test.run`, `ci.generate`,
-`secrets.scan`.
+`secrets.scan`, `deps.scan`, `doctor.check`.
 
 ## The `pipe` conveyor in detail
 
-7 stages: inspect → review → skills → knowledge → langs → clean-code →
-(optional `lab-e2e`
-via `--heavy`). Fast stages run in parallel (`--serial` restores the queue),
+8 stages: inspect → secrets → review → skills → knowledge → langs → clean-code
+→ (optional `lab-e2e`
+via `--heavy`). The `secrets` stage fails only on high-severity leaks
+(keys/tokens/private keys); password heuristics are a warning. Fast stages run
+in parallel (`--serial` restores the queue),
 the heavy one strictly after and only on green. Repeat runs reuse the
 checkpoint cache by content hashes. `--changed` checks only git-changed files
 (hold-the-line). `--only` runs selected stages. Noise suppressions require a
@@ -258,13 +271,15 @@ reason (`.forge-suppress.json`), line-level via `# forge-ignore`.
 
 ## Status and roadmap
 
-Now: core, conveyor, lab, 5 languages, editor, generators (`web`,
+Now: core, conveyor (8 stages), lab, 5 languages, editor, generators (`web`,
 `python-service`, `go-cli`, `node-api`, `rust-cli`, `paper`) + `make`, the
-`map`/`test`/`ci`/`secrets` arsenal, the `refactor` advisor, the
-`do`/`loop`/`quality` autopilot, 161 green tests.
-Honestly not done: desktop app (needs Node for Tauri), GUI screenshots,
-auto-client — marked `NOT_IMPLEMENTED`.
-Next: first arena entry, PyPI release.
+`map`/`test`/`ci`/`secrets`/`deps`/`doctor` arsenal, the `refactor` advisor, the
+`do`/`loop`/`quality` autopilot, a first arena entry (reference 3/3), 173 green
+tests.
+Honestly not done: desktop app (needs Rust for Tauri - no cargo on this machine),
+GUI screenshots, auto-client — marked `NOT_IMPLEMENTED`.
+Next: PyPI release (metadata and workflow ready; needs your trusted publisher),
+a real arena run by a model.
 
 ## License
 
@@ -277,3 +292,4 @@ MIT — see `forge/LICENSE`.
 **[🇷🇺 Читать на русском](./README_RU.md) · [🏠 Hub](./README.md)**
 
 </div>
+

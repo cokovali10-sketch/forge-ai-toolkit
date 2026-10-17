@@ -322,7 +322,7 @@ def _wire_quality(reg, local) -> None:
 
 
 def _wire_kit(reg, local) -> None:
-    """Project cannon: map / test / ci / secrets."""
+    """Project cannon: map / test / ci / secrets / doctor."""
     from ..core.registry import ModuleDef, ToolDef
     from .. import kit as _kit
     local.add(ToolDef("map.project",
@@ -343,9 +343,19 @@ def _wire_kit(reg, local) -> None:
     local.add(ToolDef("secrets.scan",
                       "Scan for leaked secrets (masked output)", level=0),
               lambda p: _kit.scan_secrets(str(p.get("root", "."))))
-    reg.add_module(ModuleDef("kit", "Project cannon: map/test/ci/secrets", "0.1.0",
+    local.add(ToolDef("doctor.check",
+                      "Audit toolchains/versions and FORGE capabilities", level=0),
+              lambda p: _kit.doctor(p.get("root")))
+    local.add(ToolDef("deps.scan",
+                      "Dependency inventory + hygiene for all ecosystems",
+                      level=0),
+              lambda p: _kit.scan_deps(str(p.get("root", ".")),
+                                       check=bool(p.get("check"))))
+    reg.add_module(ModuleDef("kit", "Project cannon: map/test/ci/secrets/doctor",
+                             "0.1.0",
                              ["map.project", "test.detect", "test.run",
-                              "ci.generate", "secrets.scan"]))
+                              "ci.generate", "secrets.scan", "doctor.check",
+                              "deps.scan"]))
 
 
 def _wire_ui(reg, local) -> None:

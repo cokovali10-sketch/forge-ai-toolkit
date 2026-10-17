@@ -1,6 +1,22 @@
 # Changelog
 
 ## Unreleased
+- kit: `forge doctor [dir]` (`doctor.check`) — audits the machine: which
+  toolchains exist and their versions, what FORGE can really do here; with a
+  path it also reports the project's test stack (read-only)
+- kit: `forge deps <dir>` (`deps.scan`) — dependency inventory across
+  python/node/go/rust/java plus hygiene findings (wildcard/unpinned/loose
+  versions, duplicates); `--check` asks native tools about outdated packages
+- pipe: new stage `secrets` (now 8 stages) — the conveyor fails only on
+  high-severity leaks (keys/tokens/private keys), password heuristics warn;
+  a line marked `forge:allow-secret` is skipped
+- bench: first arena entries — a synthetic reference candidate scores 3/3 and
+  a bad one 0/3; the harness now resolves javac sources to absolute paths and
+  falls back to `javac` from PATH when `FORGE_JAVAC` is unset; the rendered
+  board uses ASCII markers (cp1251-safe)
+- packaging: PyPI metadata (classifiers, authors, project URLs, keywords),
+  version 0.12.0, and a `release` GitHub Actions workflow (build + trusted
+  publishing on `v*` tags)
 - kit: new `forge/kit` arsenal, four commands (CLI + MCP):
   - `map` (`map.project`) — project map: languages and LOC, build files,
     entry points, largest files, internal Python import graph, dependencies

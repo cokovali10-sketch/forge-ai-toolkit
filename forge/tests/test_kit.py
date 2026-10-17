@@ -101,7 +101,8 @@ def test_scan_secrets_detects_and_masks(tmp_path):
     (tmp_path / "conf.py").write_text(
         f'aws_key = "{key}"\n'
         'api_key = "your_key_here"\n'
-        'password = "hunter2secret"\n', encoding="utf-8")
+        'password = "hunter2secret"\n'  # forge:allow-secret
+        , encoding="utf-8")
     out = scan_secrets(tmp_path)
     assert out["ok"] is True
     kinds = {f["kind"] for f in out["findings"]}
@@ -122,15 +123,44 @@ def test_scan_secrets_private_key(tmp_path):
     assert any(f["kind"] == "private-key" for f in out["findings"])
 
 
+def test_allow_marker_suppresses(tmp_path):
+    from forge.kit import scan_secrets
+    (tmp_path / "c.py").write_text(
+        'aws = "AKIAABCDEFGHIJKLMNOP"  # forge:allow-secret\n', encoding="utf-8")
+    out = scan_secrets(tmp_path)
+    assert out["count"] == 0
+
+
+def test_doctor_reports_tools_and_capabilities():
+    from forge.kit import doctor
+    d = doctor()
+    assert d["ok"] is True
+    names = [t["name"] for t in d["tools"]]
+    assert "git" in names and "python" in names
+    py = d["tools"][names.index("python")]
+    assert py["present"] is True and py["version"]
+    assert d["capabilities"]["stages"] >= 8
+    assert "python" in d["capabilities"]["languages"]
+
+
+def test_doctor_with_project(tmp_path):
+    from forge.kit import doctor
+    _py_project(tmp_path)
+    d = doctor(tmp_path)
+    assert d["project"]["exists"] is True
+    assert d["project"]["test_command"]["kind"] == "python"
+
+
 def test_cli_and_mcp_wired(tmp_path):
     from forge.cli.__main__ import main
     from forge.mcp.server import build_default_registry
     _py_project(tmp_path)
     assert main(["map", str(tmp_path), "--json"]) == 0
     assert main(["secrets", str(tmp_path)]) == 0
+    assert main(["doctor", "--json"]) == 0
     reg = build_default_registry("")
     for tool in ("map.project", "test.detect", "test.run", "ci.generate",
-                 "secrets.scan"):
+                 "secrets.scan", "doctor.check"):
         assert tool in reg.tool_owner, tool
     r = reg.call("map.project", {"root": str(tmp_path)})
     assert r["ok"] is True
