@@ -304,3 +304,45 @@ def analyze_dir(root: str | Path, exts: tuple[str, ...] = (".py",)) -> dict[str,
             all_issues.extend(res.get("issues", []))
     return {"root": str(root), "files": len(results), "total_issues": total,
             "score": score_of(all_issues, len(results)), "files_analyzed": results}
+
+
+_KIND_EFFORT = {
+    "magic-number": "S",
+    "duplicate-block": "S",
+    "too-many-args": "M",
+    "deep-nesting": "M",
+    "high-complexity": "M",
+    "long-function": "L",
+    "god-class": "L",
+}
+_SEV_ORDER = {"high": 0, "medium": 1, "low": 2}
+
+
+def make_plan(result: dict[str, Any]) -> dict[str, Any]:
+    """Превращает результат inspect в приоритетный план шагов рефакторинга.
+
+    Шаги отсортированы: сначала серьёзные (high), затем по дешевизне усилия
+    (S → M → L), затем по файлу и строке. Это порядок «что чинить первым»."""
+    entries: list[tuple[str, list[dict[str, Any]]]] = []
+    if result.get("files_analyzed") is not None:
+        entries = [(f.get("file", ""), f.get("issues", []))
+                   for f in result["files_analyzed"]]
+    else:
+        entries = [(result.get("file", ""), result.get("issues", []))]
+
+    items: list[dict[str, Any]] = []
+    for fname, issues in entries:
+        for i in issues:
+            items.append({**i, "file": fname,
+                          "effort": _KIND_EFFORT.get(i.get("kind", ""), "M")})
+    effort_rank = {"S": 0, "M": 1, "L": 2}
+    items.sort(key=lambda x: (_SEV_ORDER.get(x.get("severity", ""), 3),
+                              effort_rank.get(x.get("effort", "M"), 1),
+                              x.get("file", ""), x.get("line", 0)))
+    steps = [{"order": n, "severity": i["severity"], "kind": i["kind"],
+              "effort": i["effort"], "file": i["file"], "line": i.get("line", 0),
+              "message": i.get("message", ""), "suggestion": i.get("suggestion", "")}
+             for n, i in enumerate(items, 1)]
+    return {"root": result.get("root") or result.get("file", ""),
+            "score": result.get("score", 100),
+            "total": len(steps), "steps": steps}

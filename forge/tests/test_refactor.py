@@ -99,6 +99,27 @@ def test_api_dir_and_cli(tmp_path):
     assert main(["refactor", str(tmp_path / "nope.py")]) == 1
 
 
+def test_plan_and_sarif(tmp_path):
+    from forge.cli.__main__ import main
+    from forge.refactor import api as rapi
+    (tmp_path / "bad.py").write_text(_long_function() + _duplicate_block(),
+                                     encoding="utf-8")
+    plan = rapi.plan(str(tmp_path))
+    assert plan["total"] > 0
+    order = {"high": 0, "medium": 1, "low": 2}
+    sev = [order[s["severity"]] for s in plan["steps"]]
+    assert sev == sorted(sev)
+    assert all(s["effort"] in ("S", "M", "L") for s in plan["steps"])
+    sar = rapi.sarif(str(tmp_path))
+    assert sar["version"] == "2.1.0"
+    results = sar["runs"][0]["results"]
+    assert results and results[0]["ruleId"].startswith("forge/refactor/")
+    assert main(["refactor", str(tmp_path), "--plan"]) == 0
+    sp = tmp_path / "out.sarif"
+    assert main(["refactor", str(tmp_path), "--sarif", str(sp)]) == 0
+    assert sp.is_file()
+
+
 def test_pipe_clean_code_stage(tmp_path):
     from forge.pipe.runner import PipeRunner
     from forge.pipe.stages import DEFAULT_STAGES

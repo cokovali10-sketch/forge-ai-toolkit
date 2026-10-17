@@ -439,16 +439,40 @@ def _know_mine(args: list[str]) -> int:
 
 
 def _refactor(args: list[str]) -> int:
-    """forge refactor <file|dir> — найти проблемы чистого кода."""
+    """forge refactor <file|dir> [--plan] [--suggest] [--sarif PATH] — чистый код."""
     import json as _json
     sys.path.insert(0, str(ROOT / "src"))
     from forge.refactor import api as _api
     if not args or args[0] in ("-h", "--help", "help"):
-        print("usage: forge refactor <file|dir>")
-        print("находит длинные функции, глубокую вложенность, дубли, магические числа, God-классы")
+        print("usage: forge refactor <file|dir> [--plan] [--suggest] [--sarif PATH]")
+        print("  (без флагов)  список находок + оценка здоровья 0..100")
+        print("  --plan        приоритетный план: что чинить первым, дешевле/серьёзнее")
+        print("  --suggest     только советы, сгруппированные по файлам")
+        print("  --sarif PATH  выгрузить находки в SARIF 2.1.0 (GitHub code scanning)")
+        print("находит: длинные функции, вложенность, дубли, магические числа,")
+        print("         много аргументов, God-классы, высокую цикломатику")
         return 0
     target = args[0]
-    res = _api.inspect(target)
+    if "--sarif" in args:
+        i = args.index("--sarif")
+        if i + 1 >= len(args):
+            print("нужен путь после --sarif")
+            return 2
+        out_path = args[i + 1]
+        sarif = _api.sarif(target)
+        from pathlib import Path as _P
+        _P(out_path).write_text(_json.dumps(sarif, ensure_ascii=False, indent=2),
+                                encoding="utf-8")
+        print(f"SARIF: {len(sarif['runs'][0]['results'])} находок -> {out_path}")
+        return 0
+    if "--plan" in args:
+        res = _api.plan(target)
+        print(f"план: {res['total']} шагов, здоровье {res['score']}/100")
+        for s in res["steps"]:
+            print(f"  {s['order']:>3}. [{s['severity']}/{s['effort']}] "
+                  f"{s['kind']} {s['file']}:{s['line']} — {s['suggestion']}")
+        return 0
+    res = _api.suggest(target) if "--suggest" in args else _api.inspect(target)
     print(_json.dumps(res, ensure_ascii=False, indent=2))
     return 0 if res.get("ok", True) else 1
 
