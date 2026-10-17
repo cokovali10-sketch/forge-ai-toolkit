@@ -46,7 +46,7 @@ def sarif(path: str | Path) -> dict[str, Any]:
 
 
 def apply(path: str | Path, test_cmd: list[str] | None = None,
-          run_tests: bool = False) -> dict[str, Any]:
+          run_tests: bool = False, only: str | None = None) -> dict[str, Any]:
     """Безопасные авто-фиксы с бэкапом, проверкой синтаксиса и авто-откатом."""
     from forge.refactor.apply import apply as _apply
-    return _apply(path, test_cmd=test_cmd, run_tests=run_tests)
+    return _apply(path, test_cmd=test_cmd, run_tests=run_tests, only=only)

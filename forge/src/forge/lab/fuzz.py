@@ -5,7 +5,6 @@ Nothing is assumed: an Exception in fresh log lines = FAIL.
 """
 from __future__ import annotations
 
-import time
 
 JUNK_ARGS = ["", "abc", "-1", "999999999", "'\";drop", "x" * 300, "null",
              "@p", "~ ~ ~"]

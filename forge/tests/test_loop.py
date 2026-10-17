@@ -54,3 +54,32 @@ def test_loop_cli_and_mcp(tmp_path):
     assert "loop.run" in reg.tool_owner
     r = reg.call("loop.run", {"root": str(p), "attempts": 2})
     assert r["status"] == "SUCCESS"
+
+
+def test_loop_does_not_stash_user_work(tmp_path):
+    import subprocess
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def git(*a):
+        return subprocess.run(["git", "-C", str(repo), *a],
+                              capture_output=True, text=True)
+
+    git("init")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    (repo / "app.py").write_text("def add(a, b):\n    return a + b\n",
+                                 encoding="utf-8")
+    git("add", ".")
+    git("commit", "-m", "init")
+    (repo / "app.py").write_text("def add(a, b):\n    return a + b  # dirty\n",
+                                 encoding="utf-8")
+    (repo / "untracked.py").write_text("x = 1\n", encoding="utf-8")
+
+    from forge.pipe.loop import run_loop
+    run_loop(str(repo), "D:/Forge-Factority/forge", max_attempts=1, auto_fix=False)
+
+    # незакоммиченная работа пользователя должна остаться на месте
+    assert "dirty" in (repo / "app.py").read_text(encoding="utf-8")
+    assert (repo / "untracked.py").is_file()
+    assert git("stash", "list").stdout.strip() == ""

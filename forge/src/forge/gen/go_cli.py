@@ -5,7 +5,6 @@ Generates: go.mod, main.go (флаги --name/--count), main_test.go, README.
 """
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 MAIN = '''package main

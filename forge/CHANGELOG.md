@@ -1,6 +1,16 @@
 # Changelog
 
 ## Unreleased
+- refactor: dead-code detection — unused imports (Python) as a finding, with a
+  safe auto-fix (`--apply`) that removes them only when truly unreferenced
+  (skips `# noqa`, star and multi-line imports, honours `__all__`/strings)
+- refactor: `--apply --only imports|constants` picks a single kind of fix
+- fix: magic-constant auto-fix sliced UTF-8 `col_offset` as characters, which
+  corrupted lines with non-ASCII (Cyrillic) text; now byte-accurate
+- review: debt-marker scan no longer matches TODO/FIXME inside string literals
+  or docstrings (FORGE's own rule definitions used to flag themselves)
+- loop: safety checkpoint is now non-destructive — `forge loop` no longer hides
+  uncommitted work in a `git stash` (it records HEAD and leaves your tree intact)
 - loop: `forge loop <dir>` closes the conveyor into a self-healing loop —
   safety checkpoint -> pipe -> repair bundles -> safe fixes (or `--on-fail`
   hook) -> retry up to N attempts; `SUCCESS` only when truly green

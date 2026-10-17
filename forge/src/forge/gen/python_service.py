@@ -7,7 +7,6 @@ test_service.py (urllib, свободный порт), README.
 """
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 SERVICE = '''"""Microservice on stdlib only: GET /health, GET /hello?name=."""

@@ -71,7 +71,7 @@ def run_loop(target: str, forge_root: str, max_attempts: int = 3,
     from forge.pipe.stages import DEFAULT_STAGES
 
     stages = DEFAULT_STAGES if stages is None else stages
-    safety = _fix.checkpoint(target)
+    safety = _fix.checkpoint(target, stash=False)  # неразрушающая: работу не прячем
     attempts: list[dict[str, Any]] = []
     fixed: list[str] = []
 

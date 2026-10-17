@@ -12,7 +12,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from forge.core.result import ToolResult, timed
+from forge.core.result import ToolResult
 
 SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__",
              "build", "target", "out", ".gradle", ".idea", "dist"}

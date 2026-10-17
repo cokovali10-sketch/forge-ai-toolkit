@@ -93,13 +93,15 @@ def apply_magic_constants(path: str | Path) -> dict[str, Any]:
 
     lines = text.splitlines(keepends=True)
     for lineno, items in by_line.items():
-        line = lines[lineno - 1]
+        # col_offset/end_col_offset — смещения в байтах UTF-8, поэтому режем
+        # байты, а не символы (иначе строки с кириллицей ломаются).
+        bl = lines[lineno - 1].encode("utf-8")
         for n in sorted(items, key=lambda x: x.col_offset, reverse=True):
             end = getattr(n, "end_col_offset", None)
             if end is None:
                 continue
-            line = line[:n.col_offset] + const_names[n.value] + line[end:]
-        lines[lineno - 1] = line
+            bl = bl[:n.col_offset] + const_names[n.value].encode("utf-8") + bl[end:]
+        lines[lineno - 1] = bl.decode("utf-8")
 
     insert_at = 0
     if (tree.body and isinstance(tree.body[0], ast.Expr)
@@ -107,7 +109,7 @@ def apply_magic_constants(path: str | Path) -> dict[str, Any]:
             and isinstance(tree.body[0].value.value, str)):
         insert_at = tree.body[0].end_lineno or 0
     for n in tree.body:
-        if isinstance(n, ast.ImportFrom) and n.module == "__future__":
+        if isinstance(n, (ast.Import, ast.ImportFrom)):
             insert_at = max(insert_at, n.end_lineno or 0)
 
     defs = ["# --- константы вынесены FORGE refactor ---\n"]
@@ -121,9 +123,58 @@ def apply_magic_constants(path: str | Path) -> dict[str, Any]:
             "occurrences": len(targets)}
 
 
+def apply_unused_imports(path: str | Path) -> dict[str, Any]:
+    """Удаляет неиспользуемые импорты (Python). Возвращает отчёт.
+
+    Поведение не меняется: удаляются только имена, которые нигде не встречаются
+    (в т.ч. в строках и `__all__`); многострочные импорты и `# noqa` не трогаем."""
+    p = Path(path)
+    if p.suffix.lower() != ".py":
+        return {"changed": False, "reason": "авто-фикс пока только для Python"}
+    text = p.read_text(encoding="utf-8")
+    try:
+        tree = ast.parse(text)
+    except SyntaxError as e:
+        return {"changed": False, "reason": f"файл не парсится: {e}"}
+
+    from forge.refactor.clean_code import collect_unused_imports
+    plain = text.splitlines()
+    groups = collect_unused_imports(tree, plain)
+    if not groups:
+        return {"changed": False, "reason": "нет неиспользуемых импортов"}
+
+    lines = text.splitlines(keepends=True)
+    removed: list[str] = []
+    for stmt, names in sorted(groups, key=lambda g: -g[0].lineno):
+        drop = set(names)
+        keep = [a for a in stmt.names
+                if (a.asname or (a.name.split(".")[0] if isinstance(stmt, ast.Import)
+                                 else a.name)) not in drop]
+        start = stmt.lineno - 1
+        end = (getattr(stmt, "end_lineno", stmt.lineno) or stmt.lineno) - 1
+        indent = re.match(r"[ \t]*", plain[stmt.lineno - 1]).group(0)
+        if not keep:
+            del lines[start:end + 1]
+        else:
+            alias = [(f"{a.name} as {a.asname}" if a.asname else a.name) for a in keep]
+            if isinstance(stmt, ast.Import):
+                rendered = "import " + ", ".join(alias)
+            else:
+                mod = "." * stmt.level + (stmt.module or "")
+                rendered = f"from {mod} import " + ", ".join(alias)
+            lines[start] = indent + rendered + "\n"
+        removed.extend(names)
+
+    p.write_text("".join(lines), encoding="utf-8")
+    return {"changed": True, "removed_imports": sorted(set(removed))}
+
+
 def apply(path: str | Path, test_cmd: list[str] | None = None,
-          run_tests: bool = False) -> dict[str, Any]:
-    """Применить безопасные фиксы с бэкапом, проверкой и авто-откатом."""
+          run_tests: bool = False, only: str | None = None) -> dict[str, Any]:
+    """Применить безопасные фиксы с бэкапом, проверкой и авто-откатом.
+
+    `only` позволяет выбрать один вид фикса: `"imports"` (мёртвые импорты) или
+    `"constants"` (магические числа). `None` — оба."""
     p = Path(path)
     if not p.is_file():
         return {"ok": False, "changed": False, "error": f"файл не найден: {p}"}
@@ -131,10 +182,14 @@ def apply(path: str | Path, test_cmd: list[str] | None = None,
     backup = p.with_suffix(p.suffix + ".forgebak")
     backup.write_text(original, encoding="utf-8")
 
-    fix = apply_magic_constants(p)
-    if not fix.get("changed"):
+    fix_imports = (apply_unused_imports(p) if only in (None, "imports")
+                   else {"changed": False})
+    fix_magic = (apply_magic_constants(p) if only in (None, "constants")
+                 else {"changed": False})
+    if not (fix_imports.get("changed") or fix_magic.get("changed")):
         backup.unlink(missing_ok=True)
-        return {"ok": True, "changed": False, "reason": fix.get("reason", "")}
+        reason = fix_magic.get("reason") or fix_imports.get("reason") or "нечего чинить"
+        return {"ok": True, "changed": False, "reason": reason}
 
     def rollback(reason: str, extra: dict | None = None) -> dict[str, Any]:
         p.write_text(original, encoding="utf-8")
@@ -165,5 +220,10 @@ def apply(path: str | Path, test_cmd: list[str] | None = None,
                                                    "output_tail": tail})
 
     backup.unlink(missing_ok=True)
-    return {"ok": True, "changed": True, "constants": fix["constants"],
-            "occurrences": fix["occurrences"], "tests_returncode": tests_rc}
+    out: dict[str, Any] = {"ok": True, "changed": True, "tests_returncode": tests_rc}
+    if fix_magic.get("changed"):
+        out["constants"] = fix_magic["constants"]
+        out["occurrences"] = fix_magic["occurrences"]
+    if fix_imports.get("changed"):
+        out["removed_imports"] = fix_imports["removed_imports"]
+    return out

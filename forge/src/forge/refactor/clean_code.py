@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -247,6 +248,72 @@ def _duplicate_blocks(lines: list[str]) -> list[Issue]:
     return issues
 
 
+def _noqa_lines(lines: list[str]) -> set[int]:
+    """Строки (1-based) с `# noqa` — такие импорты не трогаем."""
+    return {i for i, line in enumerate(lines, 1) if "# noqa" in line}
+
+
+def _local_name(node: ast.Import | ast.ImportFrom, a: ast.alias) -> str:
+    if isinstance(node, ast.Import):
+        return a.asname or a.name.split(".")[0]
+    return a.asname or a.name
+
+
+def collect_unused_imports(tree: ast.Module,
+                           lines: list[str]) -> list[tuple[ast.stmt, list[str]]]:
+    """Группирует неиспользуемые импорты по инструкции.
+
+    Возвращает список `(узел, [локальные имена для удаления])`. Консервативно:
+    однострочные инструкции без inline-комментариев/`# noqa`; имена, встречающиеся
+    где-либо (в т.ч. в строках — `__all__`, докстринги), считаются использованными."""
+    imported: dict[str, tuple[ast.stmt, ast.alias]] = {}
+    for node in tree.body:
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                imported.setdefault(a.asname or a.name.split(".")[0], (node, a))
+        elif isinstance(node, ast.ImportFrom):
+            if node.module == "__future__":
+                continue
+            for a in node.names:
+                if a.name == "*":
+                    continue
+                imported.setdefault(a.asname or a.name, (node, a))
+
+    used: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name):
+            used.add(node.id)
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            used.update(re.findall(r"\w+", node.value))
+
+    skip = _noqa_lines(lines)
+    groups: dict[int, tuple[ast.stmt, list[str]]] = {}
+    for name, (stmt, _a) in imported.items():
+        if name in used:
+            continue
+        start = stmt.lineno
+        end = getattr(stmt, "end_lineno", start) or start
+        if start != end or start in skip or end in skip:
+            continue
+        if "#" in (lines[start - 1] if 1 <= start <= len(lines) else ""):
+            continue
+        groups.setdefault(start, (stmt, []))[1].append(name)
+    return list(groups.values())
+
+
+def _unused_imports(tree: ast.Module, lines: list[str]) -> list[Issue]:
+    """Неиспользуемые импорты — мёртвый код, который безопасно удалить."""
+    issues: list[Issue] = []
+    for stmt, names in collect_unused_imports(tree, lines):
+        context = lines[stmt.lineno - 1].strip() if 1 <= stmt.lineno <= len(lines) else ""
+        issues.append(Issue(
+            kind="unused-import", file="", line=stmt.lineno,
+            message=f"неиспользуемые импорты: {', '.join(sorted(names))}",
+            suggestion="Удали их (forge refactor --apply сделает это сам безопасно)",
+            severity="low", context=context))
+    return issues
+
+
 DEFAULT_CODE_EXTS = (".py", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
                      ".go", ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".h",
                      ".java", ".kt", ".rs")
@@ -287,6 +354,7 @@ def _analyze_python(p: Path) -> dict[str, Any]:
 
     issues.extend(_magic_numbers(tree, lines))
     issues.extend(_duplicate_blocks(lines))
+    issues.extend(_unused_imports(tree, lines))
 
     for issue in issues:
         issue.file = str(p)
@@ -323,6 +391,7 @@ def analyze_dir(root: str | Path,
 _KIND_EFFORT = {
     "magic-number": "S",
     "duplicate-block": "S",
+    "unused-import": "S",
     "too-many-args": "M",
     "deep-nesting": "M",
     "high-complexity": "M",

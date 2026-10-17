@@ -109,6 +109,19 @@ def test_review_suppress_needs_reason(tmp_path):
     assert r2["confirmed"] >= 1 and r2["suppressed"] == 0
 
 
+def test_review_ignores_debt_markers_in_strings(tmp_path):
+    from forge.quality.review import review
+    (tmp_path / "a.py").write_text(
+        '"""Doc mentions TODO/FIXME as examples only."""\n'
+        'PATTERN = r"\\b(TODO|FIXME|XXX|HACK)\\b"\n'
+        'LABEL = "Debt marker (TODO/FIXME/XXX/HACK)"\n'
+        '# TODO: real one\n',
+        encoding="utf-8")
+    r = review(tmp_path)
+    got = [f["detail"] for f in r["findings"] if f["rule"] == "debt-marker"]
+    assert len(got) == 1 and "real one" in got[0]
+
+
 def test_review_stage_reads_suppress_file(tmp_path):
     import json as _json
     from forge.pipe.stages import stage_review

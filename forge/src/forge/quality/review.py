@@ -27,6 +27,69 @@ def _ignored(line: str, rule: str) -> bool:
     return not tail or tail.split()[0].strip(",") == rule
 
 
+def _strip_strings(text: str) -> str:
+    """Заменяет содержимое строковых литералов пробелами, СОХРАНЯЯ комментарии.
+
+    Debt-маркеры ищем в коде и комментариях, но не внутри строк/докстрингов —
+    иначе определения правил «палят» сами себя (TODO внутри regex-строки).
+    Номера строк не сдвигаются."""
+    out: list[str] = []
+    i, n = 0, len(text)
+    quote = ""
+    line_comment = False
+    block_comment = False
+    while i < n:
+        c = text[i]
+        nxt = text[i + 1] if i + 1 < n else ""
+        nxt2 = text[i + 2] if i + 2 < n else ""
+        if line_comment:
+            out.append(c)
+            if c == "\n":
+                line_comment = False
+        elif block_comment:
+            out.append(c)
+            if c == "*" and nxt == "/":
+                out.append("/")
+                i += 1
+                block_comment = False
+        elif quote:
+            if c == "\\":
+                out.append("  ")
+                i += 1
+            elif c == "\n":
+                out.append("\n")
+            elif text.startswith(quote, i):
+                out.append(" " * len(quote))
+                i += len(quote) - 1
+                quote = ""
+            else:
+                out.append(" ")
+        else:
+            if c == "#":
+                line_comment = True
+                out.append(c)
+            elif c == "/" and nxt == "/":
+                line_comment = True
+                out.append("//")
+                i += 1
+            elif c == "/" and nxt == "*":
+                block_comment = True
+                out.append("/*")
+                i += 1
+            elif c in "\"'`":
+                if c in "\"'" and nxt == c and nxt2 == c:
+                    quote = c * 3
+                    out.append(" " * 3)
+                    i += 2
+                else:
+                    quote = c
+                    out.append(" ")
+            else:
+                out.append(c)
+        i += 1
+    return "".join(out)
+
+
 def review(root: str | Path, max_files: int = 500,
            suppress: list[dict] | None = None,
            only: set[str] | None = None) -> dict:
@@ -66,19 +129,21 @@ def review(root: str | Path, max_files: int = 500,
             continue
         rel = str(fp.relative_to(base)).replace("\\", "/")
         lines = text.splitlines()
+        code_lines = _strip_strings(text).splitlines()
         total_lines += len(lines)
         if len(lines) > 800:
             findings.append({"level": "probable", "rule": "oversized-file",
                              "file": rel, "detail": f"{len(lines)} lines"})
         for i, line in enumerate(lines, 1):
             s = line.strip()
-            if re.search(r"\b(TODO|FIXME|XXX|HACK)\b", s) and not _ignored(s, "debt-marker"):
+            code = code_lines[i - 1].strip() if i - 1 < len(code_lines) else s
+            if re.search(r"\b(TODO|FIXME|XXX|HACK)\b", code) and not _ignored(line, "debt-marker"):
                 findings.append({"level": "confirmed", "rule": "debt-marker",
                                  "file": rel, "detail": f"L{i}: {s[:100]}"})
-            if re.match(r"catch\s*\(.*\)\s*\{\s*\}$", s) and not _ignored(s, "empty-catch"):
+            if re.match(r"catch\s*\(.*\)\s*\{\s*\}$", s) and not _ignored(line, "empty-catch"):
                 findings.append({"level": "probable", "rule": "empty-catch",
                                  "file": rel, "detail": f"L{i}"})
-            if ("System.out.print" in s or "printStackTrace()" in s) and not _ignored(s, "debug-leftover"):
+            if ("System.out.print" in code or "printStackTrace()" in code) and not _ignored(line, "debug-leftover"):
                 findings.append({"level": "probable", "rule": "debug-leftover",
                                  "file": rel, "detail": f"L{i}: {s[:80]}"})
     findings.extend(_duplicates(files, base))

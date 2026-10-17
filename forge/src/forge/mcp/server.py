@@ -224,7 +224,8 @@ def _wire_refactor(reg, local) -> None:
     local.add(ToolDef("refactor.apply", "Apply safe auto-fixes (backup+verify+rollback)", level=2),
               lambda p: _api.apply(str(p.get("path", "")),
                                    test_cmd=p.get("test_cmd"),
-                                   run_tests=bool(p.get("run_tests"))))
+                                   run_tests=bool(p.get("run_tests")),
+                                   only=p.get("only")))
     reg.add_module(ModuleDef("refactor", "Clean-code advisor", "0.1.0",
                              ["refactor.inspect", "refactor.plan", "refactor.sarif",
                               "refactor.apply"]))

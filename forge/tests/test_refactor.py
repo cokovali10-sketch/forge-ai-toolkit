@@ -216,6 +216,88 @@ def test_apply_non_python(tmp_path):
     assert res["ok"] and not res["changed"]
 
 
+def test_unused_import_detected(tmp_path):
+    from forge.refactor.clean_code import analyze_file
+    p = tmp_path / "u.py"
+    p.write_text("import os\nimport sys\n\n\nprint(sys.argv)\n", encoding="utf-8")
+    res = analyze_file(p)
+    found = [i for i in res["issues"] if i["kind"] == "unused-import"]
+    assert found and "os" in found[0]["message"]
+    assert all("sys" not in i["message"] for i in found)
+
+
+def test_unused_import_respects_noqa_and_strings(tmp_path):
+    from forge.refactor.clean_code import analyze_file
+    p = tmp_path / "u.py"
+    p.write_text("import os  # noqa: F401\nimport json\n\n__all__ = ['json']\n",
+                 encoding="utf-8")
+    res = analyze_file(p)
+    assert not [i for i in res["issues"] if i["kind"] == "unused-import"]
+
+
+def test_apply_removes_unused_imports(tmp_path):
+    from forge.refactor import api as rapi
+    p = tmp_path / "u.py"
+    p.write_text(
+        "import os\n"
+        "import sys\n"
+        "from json import loads, dumps\n"
+        "\n\n"
+        "def f():\n"
+        "    return sys.argv\n",
+        encoding="utf-8")
+    res = rapi.apply(str(p))
+    assert res["ok"] and res["changed"]
+    assert set(res["removed_imports"]) == {"os", "loads", "dumps"}
+    text = p.read_text(encoding="utf-8")
+    assert "import os" not in text
+    assert "import sys" in text
+    assert "json" not in text
+    assert not (tmp_path / "u.py.forgebak").exists()
+    ns: dict = {}
+    exec(compile(text, str(p), "exec"), ns)  # behavior preserved
+
+
+def test_apply_keeps_used_from_import(tmp_path):
+    from forge.refactor import api as rapi
+    p = tmp_path / "p.py"
+    p.write_text("from json import loads, dumps\n\n\ndef g(t):\n    return loads(t)\n",
+                 encoding="utf-8")
+    res = rapi.apply(str(p))
+    assert res["ok"] and res["changed"]
+    text = p.read_text(encoding="utf-8")
+    assert "from json import loads" in text
+    assert "dumps" not in text
+
+
+def test_apply_keeps_noqa_import(tmp_path):
+    from forge.refactor import api as rapi
+    p = tmp_path / "n.py"
+    p.write_text("import os  # noqa: F401\n\n\nprint(1)\n", encoding="utf-8")
+    res = rapi.apply(str(p))
+    assert res["ok"] and not res["changed"]
+    assert "import os" in p.read_text(encoding="utf-8")
+
+
+def test_apply_handles_cyrillic_before_number(tmp_path):
+    from forge.refactor import api as rapi
+    p = tmp_path / "ru.py"
+    p.write_text(
+        'ROW = ("1/7 осмотр проекта", 60.0, 60.0)\n'
+        '\n\n'
+        'def f(x):\n'
+        '    return x\n',
+        encoding="utf-8")
+    res = rapi.apply(str(p))
+    assert res["ok"] and res["changed"]
+    text = p.read_text(encoding="utf-8")
+    assert '"1/7 осмотр проекта"' in text
+    assert "CONST_60 = 60.0" in text
+    ns: dict = {}
+    exec(compile(text, str(p), "exec"), ns)
+    assert ns["ROW"] == ("1/7 осмотр проекта", 60.0, 60.0)
+
+
 def test_pipe_clean_code_stage(tmp_path):
     from forge.pipe.runner import PipeRunner
     from forge.pipe.stages import DEFAULT_STAGES

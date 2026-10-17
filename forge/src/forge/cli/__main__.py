@@ -450,11 +450,12 @@ def _refactor(args: list[str]) -> int:
         print("  --plan        приоритетный план: что чинить первым, дешевле/серьёзнее")
         print("  --suggest     только советы, сгруппированные по файлам")
         print("  --sarif PATH  выгрузить находки в SARIF 2.1.0 (GitHub code scanning)")
-        print("  --apply       авто-фикс повторяющихся магических чисел (Python),")
-        print("                с бэкапом, проверкой синтаксиса и авто-откатом")
+        print("  --apply       авто-фикс: мёртвые импорты + повторяющиеся числа")
+        print("                (Python), с бэкапом, проверкой и авто-откатом")
         print("  --test \"cmd\"  прогнать тесты после фикса (иначе откат)")
+        print("  --only KIND   только один фикс: imports | constants")
         print("находит: длинные функции, вложенность, дубли, магические числа,")
-        print("         много аргументов, God-классы, высокую цикломатику")
+        print("         много аргументов, God-классы, цикломатику, мёртвые импорты")
         return 0
     target = args[0]
     if "--apply" in args:
@@ -468,7 +469,8 @@ def _refactor(args: list[str]) -> int:
                 return 2
             test_cmd = shlex.split(args[i + 1])
             run_tests = True
-        res = _api.apply(target, test_cmd=test_cmd, run_tests=run_tests)
+        res = _api.apply(target, test_cmd=test_cmd, run_tests=run_tests,
+                         only=_flag(args, "--only"))
         print(_json.dumps(res, ensure_ascii=False, indent=2))
         return 0 if res.get("ok") else 1
     if "--sarif" in args:

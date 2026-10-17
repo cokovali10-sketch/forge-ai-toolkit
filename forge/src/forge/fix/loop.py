@@ -30,17 +30,21 @@ def _is_repo(project: Path) -> bool:
     return ok
 
 
-def checkpoint(project: str | Path) -> dict:
-    """Save restore point. Returns handle dict (also written to state file)."""
+def checkpoint(project: str | Path, stash: bool = True) -> dict:
+    """Save restore point. Returns handle dict (also written to state file).
+
+    `stash=False` — неразрушающая страховка: запоминаем HEAD, но НЕ прячем
+    рабочее дерево в git stash (иначе несохранённая работа пользователя молча
+    исчезнет из рабочей папки). Так делает `forge loop`."""
     p = Path(project).resolve()
     handle: dict = {"project": str(p), "at": time.time(), "kind": None}
     if _is_repo(p):
         clean_ok, status = _git(p, "status", "--short")
         ok, sha = _git(p, "rev-parse", "HEAD")
         head = sha.strip() if ok else ""
-        if clean_ok and not status.strip():
-            # Nothing to stash: record HEAD, rollback restores tracked files.
-            handle.update(kind="git-head", head=head)
+        if not stash or (clean_ok and not status.strip()):
+            # Ничего не прячем: отмечаем HEAD; незакоммиченная работа остаётся.
+            handle.update(kind="git-head", head=head, dirty=bool(status.strip()))
         else:
             ok, out = _git(p, "stash", "push", "-u", "-m", "forge-fix checkpoint")
             if not ok or "No local changes" in out:
