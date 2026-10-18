@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- refactor: `forge fix [dir]` (`refactor.fix_dir`) — batch safe auto-fixes
+  across all `.py` at once (unused imports, magic numbers, `== None`);
+  tests run once, one rollback covers every changed file; `forge refactor
+  <dir> --apply` now accepts a directory
 - kit: `forge baseline save|check|diff` (`baseline.save`/`baseline.check`) —
   "hold the line": snapshot current findings, then fail only on NEW ones
   (fingerprints stable across line shifts); `forge audit --baseline` gates too

@@ -148,6 +148,7 @@ builds and writes — 2. The client decides what the agent may do.
 | `forge report [dir]` | one consolidated report: audit + trend + pipe + env |
 | `forge serve [dir]` | local dashboard + JSON API for the project |
 | `forge baseline save\|check` | hold the line: fail only on NEW findings |
+| `forge fix [dir]` | batch safe auto-fixes (backup, verify, rollback) |
 | `forge refactor <file\|dir>` | clean-code advisor: long functions, nesting, duplicates, magic numbers |
 | `forge do "<intent>"` | orchestrator: generator, modules, skills, knowledge, plan, verify |
 | `forge loop <dir>` | closed loop: conveyor → repair bundles → safe fixes → retry |
@@ -291,6 +292,23 @@ forge audit . --baseline                    :: audit + baseline gate
 In CI: `forge baseline check . --fail-on high` — red only if you introduced a
 **new** serious problem. For agents: `baseline.save`, `baseline.check`.
 
+## Batch auto-fixes: `forge fix`
+
+Runs **all** safe fixes across every `.py` in the project at once: unused
+imports, repeated magic numbers, `== None` -> `is None`. Each file is fixed with
+a backup and a syntax check; with `--test "cmd"` the tests run **once** at the
+end, and on failure **all** changed files are rolled back — behaviour never
+changes.
+
+```bat
+forge fix .                          :: all fixes across every .py
+forge fix . --only imports           :: unused imports only
+forge fix . --test "python -m pytest -q"   :: with a check and one big rollback
+```
+
+(Single file: `forge refactor file.py --apply`; a directory works too.)
+For agents: `refactor.fix_dir`.
+
 ## The `pipe` conveyor in detail
 
 8 stages: inspect → secrets → review → skills → knowledge → langs → clean-code
@@ -326,7 +344,7 @@ reason (`.forge-suppress.json`), line-level via `# forge-ignore`.
 Now: core, conveyor (8 stages), lab, 5 languages, editor, generators (`web`,
 `python-service`, `go-cli`, `node-api`, `rust-cli`, `paper`) + `make`, the
 `map`/`test`/`ci`/`secrets`/`deps`/`doctor` arsenal, the `refactor` advisor, the
-`do`/`loop`/`quality` autopilot, a first arena entry (reference 3/3), 190 green
+`do`/`loop`/`quality` autopilot, a first arena entry (reference 3/3), 197 green
 tests.
 Honestly not done: desktop app (needs Rust for Tauri - no cargo on this machine),
 GUI screenshots, auto-client — marked `NOT_IMPLEMENTED`.

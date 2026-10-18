@@ -474,8 +474,10 @@ def _refactor(args: list[str]) -> int:
                 return 2
             test_cmd = shlex.split(args[i + 1])
             run_tests = True
-        res = _api.apply(target, test_cmd=test_cmd, run_tests=run_tests,
-                         only=_flag(args, "--only"))
+        from pathlib import Path as _P
+        apply_fn = _api.apply_dir if _P(target).is_dir() else _api.apply
+        res = apply_fn(target, test_cmd=test_cmd, run_tests=run_tests,
+                       only=_flag(args, "--only"))
         print(_json.dumps(res, ensure_ascii=False, indent=2))
         return 0 if res.get("ok") else 1
     if "--sarif" in args:
@@ -581,7 +583,8 @@ def _flag(args: list[str], name: str) -> str:
 
 
 _VALUE_FLAGS = {"--timeout", "--max-files", "--min-score", "--max-regression",
-                "--path", "--fail-on", "--baseline", "--html"}
+                "--path", "--fail-on", "--baseline", "--html", "--test",
+                "--only"}
 
 
 def _positionals(args: list[str]) -> list[str]:
@@ -902,6 +905,54 @@ def _baseline(args: list[str]) -> int:
     for i in d["resolved"][:10]:
         print(f"  - [{i['severity']}] {i['area']}: {i['detail']} ({i['file']})")
     return 0
+
+
+def _fix(args: list[str]) -> int:
+    """forge fix [dir] [--only KIND] [--test "cmd"] [--json]: пакетные автофиксы."""
+    import json as _json
+    import shlex
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.refactor import api as _api
+    if args and args[0] in ("-h", "--help", "help"):
+        print("usage: forge fix [dir] [--only imports|constants|comparisons] "
+              "[--test \"cmd\"] [--json]")
+        print("  безопасные автофиксы во всех .py проекта: бэкап, проверка")
+        print("  синтаксиса и единый откат при падении тестов (--test)")
+        return 0
+    pos = _positionals(args)
+    root = pos[0] if pos else "."
+    test_cmd = None
+    run_tests = False
+    t = _flag(args, "--test")
+    if t:
+        test_cmd = shlex.split(t)
+        run_tests = True
+    res = _api.apply_dir(root, test_cmd=test_cmd, run_tests=run_tests,
+                         only=_flag(args, "--only") or None)
+    if "--json" in args:
+        print(_json.dumps(res, ensure_ascii=False, indent=2))
+        return 0 if res.get("ok") else 1
+    if not res.get("ok") and res.get("error"):
+        print(f"fix: {res['error']}")
+        return 1
+    if res.get("rolled_back"):
+        print(f"fix: тесты упали ({res.get('tests_returncode')}) — "
+              f"откат всех правок")
+        return 1
+    print(f"fix: изменено файлов {res['files_changed']} "
+          f"из {res['files_scanned']}")
+    for c in res.get("changed", [])[:20]:
+        bits = []
+        if c.get("removed_imports"):
+            bits.append(f"импортов -{len(c['removed_imports'])}")
+        if c.get("constants"):
+            bits.append(f"констант {len(c['constants'])}")
+        if c.get("fixed_comparisons"):
+            bits.append(f"сравнений {c['fixed_comparisons']}")
+        print(f"  {c['file']}: " + ", ".join(bits))
+    for e in res.get("errors", [])[:10]:
+        print(f"  ! {e.get('file')}: {e.get('error')}")
+    return 0 if res.get("ok") else 1
 
 
 def _evolve(args: list[str]) -> int:
@@ -1385,6 +1436,8 @@ def main(argv: list[str] | None = None) -> int:
         return _serve(args[1:])
     if cmd == "baseline":
         return _baseline(args[1:])
+    if cmd == "fix":
+        return _fix(args[1:])
     if cmd == "docs":
         return _docs(args[1:])
     if cmd == "bench":

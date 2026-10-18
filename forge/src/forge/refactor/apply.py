@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import ast
+import os
 import py_compile
 import re
 from pathlib import Path
@@ -201,6 +202,77 @@ def apply_comparisons(path: str | Path) -> dict[str, Any]:
 
     p.write_text("".join(lines), encoding="utf-8")
     return {"changed": True, "fixed_comparisons": len(edits)}
+
+
+_SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules", "dist",
+              "build", "target", ".mypy_cache", ".pytest_cache", ".gradle",
+              ".tox", ".eggs", "site-packages"}
+
+
+def apply_dir(root: str | Path, test_cmd: list[str] | None = None,
+              run_tests: bool = False, only: str | None = None,
+              max_files: int = 2000) -> dict[str, Any]:
+    """Пакетные автофиксы во всех .py проекта с единым откатом.
+
+    Каждый файл правится безопасно (бэкап + проверка синтаксиса). Если заданы
+    тесты — они прогоняются ОДИН раз в конце; при падении откатываются все
+    изменённые файлы (поведение проекта не меняется)."""
+    base = Path(root)
+    if not base.is_dir():
+        return {"ok": False, "error": f"не директория: {base}"}
+    files: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(base, onerror=lambda e: None):
+        dirnames[:] = [d for d in dirnames
+                       if d not in _SKIP_DIRS and not d.startswith(".")]
+        for fn in sorted(filenames):
+            if fn.endswith(".py"):
+                files.append(Path(dirpath) / fn)
+        if len(files) >= max_files:
+            break
+    files = files[:max_files]
+
+    originals: dict[Path, str] = {}
+    changed: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+    for f in files:
+        rel = str(f.relative_to(base)).replace("\\", "/")
+        try:
+            originals[f] = f.read_text(encoding="utf-8-sig")
+        except OSError as e:
+            errors.append({"file": rel, "error": str(e)})
+            continue
+        res = apply(f, only=only)
+        if not res.get("ok"):
+            errors.append({"file": rel, "error": res.get("error", "ошибка")})
+        elif res.get("changed"):
+            detail = {k: v for k, v in res.items()
+                      if k not in ("ok", "changed", "tests_returncode")}
+            changed.append({"file": rel, **detail})
+
+    tests_rc = None
+    rolled_back = False
+    if run_tests and test_cmd and changed:
+        import subprocess
+        try:
+            r = subprocess.run(test_cmd, cwd=str(base), capture_output=True,
+                               text=True, timeout=900)
+        except (OSError, subprocess.SubprocessError) as e:
+            tests_rc = -1
+            errors.append({"file": "", "error": f"тесты не запустились: {e}"})
+            r = None
+        if r is not None:
+            tests_rc = r.returncode
+        if tests_rc != 0:
+            for f in [c for c in originals]:
+                f.write_text(originals[f], encoding="utf-8")
+            rolled_back = True
+
+    return {"ok": not errors and not rolled_back,
+            "root": str(base), "files_scanned": len(files),
+            "files_changed": 0 if rolled_back else len(changed),
+            "changed": [] if rolled_back else changed,
+            "errors": errors, "tests_returncode": tests_rc,
+            "rolled_back": rolled_back}
 
 
 def apply(path: str | Path, test_cmd: list[str] | None = None,

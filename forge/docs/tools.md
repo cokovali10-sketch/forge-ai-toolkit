@@ -1,6 +1,6 @@
 # Tool Catalog (generated — do not edit by hand)
 
-SOURCE_OF_TRUTH = registry (59 tools)
+SOURCE_OF_TRUTH = registry (60 tools)
 
 ## audit.run
 - module: kit, backend: local, level: 1
@@ -197,6 +197,10 @@ SOURCE_OF_TRUTH = registry (59 tools)
 ## refactor.apply
 - module: refactor, backend: local, level: 2
 - Apply safe auto-fixes (backup+verify+rollback)
+
+## refactor.fix_dir
+- module: refactor, backend: local, level: 2
+- Batch safe auto-fixes across all .py with one rollback
 
 ## refactor.inspect
 - module: refactor, backend: local, level: 0

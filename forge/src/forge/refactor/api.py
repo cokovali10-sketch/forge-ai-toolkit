@@ -47,6 +47,13 @@ def sarif(path: str | Path) -> dict[str, Any]:
 
 def apply(path: str | Path, test_cmd: list[str] | None = None,
           run_tests: bool = False, only: str | None = None) -> dict[str, Any]:
-    """Безопасные авто-фиксы с бэкапом, проверкой синтаксиса и авто-откатом."""
+    """Применить безопасные авто-фиксы к одному файлу, с бэкапом и откатом."""
     from forge.refactor.apply import apply as _apply
     return _apply(path, test_cmd=test_cmd, run_tests=run_tests, only=only)
+
+
+def apply_dir(root: str | Path, test_cmd: list[str] | None = None,
+              run_tests: bool = False, only: str | None = None) -> dict[str, Any]:
+    """Пакетные авто-фиксы во всех .py проекта, с единым откатом при падении тестов."""
+    from forge.refactor.apply import apply_dir as _apply_dir
+    return _apply_dir(root, test_cmd=test_cmd, run_tests=run_tests, only=only)

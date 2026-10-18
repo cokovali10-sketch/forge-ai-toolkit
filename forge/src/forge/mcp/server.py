@@ -227,9 +227,15 @@ def _wire_refactor(reg, local) -> None:
                                    test_cmd=p.get("test_cmd"),
                                    run_tests=bool(p.get("run_tests")),
                                    only=p.get("only")))
+    local.add(ToolDef("refactor.fix_dir",
+                      "Batch safe auto-fixes across all .py with one rollback",
+                      level=2),
+              lambda p: _api.apply_dir(str(p.get("root", ".")),
+                                       only=p.get("only"),
+                                       run_tests=bool(p.get("run_tests"))))
     reg.add_module(ModuleDef("refactor", "Clean-code advisor", "0.1.0",
                              ["refactor.inspect", "refactor.plan", "refactor.sarif",
-                              "refactor.apply"]))
+                              "refactor.apply", "refactor.fix_dir"]))
 
 
 def _wire_gen(reg, local) -> None:
