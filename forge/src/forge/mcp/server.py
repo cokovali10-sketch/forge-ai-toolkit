@@ -109,6 +109,9 @@ def build_default_registry(anvil_dir: str = "") -> Registry:
                              "0.1.0", [t[0] for t in TOOLS]))
     _wire_lab(reg, local)
     _wire_gen(reg, local)
+    _wire_web(reg, local)
+    _wire_factory(reg, local)
+    _wire_speed(reg, local)
     _wire_ui(reg, local)
     _wire_langs(reg, local)
     _wire_edit(reg, local)
@@ -249,7 +252,10 @@ def _wire_gen(reg, local) -> None:
     from ..gen import web as _w
     local.add(ToolDef("gen.web", "Scaffold landing page", level=1),
               lambda p: _w.generate(str(p.get("out", ".")),
-                                    str(p.get("name", "Site"))))
+                                    str(p.get("name", "Site")),
+                                    preset=str(p.get("preset", "aurora")),
+                                    tagline=str(p.get("tagline", "")),
+                                    lang=str(p.get("lang", "ru"))))
     local.add(ToolDef("gen.python_service", "Scaffold stdlib microservice",
                       level=1),
               lambda p: _ps.generate(str(p.get("out", ".")),
@@ -286,6 +292,146 @@ def _make_project(p: dict) -> dict:
     return _mk(str(p.get("kind", "")), str(p.get("name", "demo")),
                str(p.get("out", ".")),
                str(_P(__file__).resolve().parents[3]))
+
+
+def _wire_web(reg, local) -> None:
+    """Web Studio: animated static sites + honest audit."""
+    from ..core.registry import ToolDef
+    from ..webstudio import audit as _a
+    from ..webstudio import generate as _g
+    from ..webstudio import list_presets as _p
+    local.add(ToolDef("web.presets", "List Web Studio presets", level=0),
+              lambda p: {"presets": _p()})
+    local.add(ToolDef("web.generate",
+                      "Generate an animated static site (no deps)", level=1),
+              lambda p: _g(str(p.get("out", ".")),
+                           str(p.get("name", "Site")),
+                           preset=str(p.get("preset", "aurora")),
+                           tagline=str(p.get("tagline", "")),
+                           lang=str(p.get("lang", "ru"))))
+    local.add(ToolDef("web.audit",
+                      "Audit a generated site (structure/contrast/motion)",
+                      level=0),
+              lambda p: _a(str(p.get("root", "."))))
+    reg.add_module(ModuleDef("webstudio", "Web Studio generator", "0.1.0",
+                             ["web.presets", "web.generate", "web.audit"]))
+
+
+def _wire_speed(reg, local) -> None:
+    """Speed department: batch files/edits, context packs, blueprints."""
+    from ..core.registry import ToolDef
+    from ..speed import api as _s
+
+    def obj(props: dict, required: list[str] | None = None) -> dict:
+        return {"type": "object", "properties": props,
+                "required": required or []}
+
+    text = {"type": "string"}
+    boolean = {"type": "boolean"}
+    integer = {"type": "integer"}
+    strings = {"type": "array", "items": {"type": "string"}}
+    local.add(ToolDef(
+        "speed.write", "Write many files in one call (atomic rollback)",
+        level=2, timeout=600,
+        schema=obj({
+            "root": text, "files": {"type": ["object", "array"]},
+            "atomic": boolean, "backup": boolean, "dry_run": boolean,
+        }, ["root", "files"])),
+        lambda p: _s.write(str(p.get("root", "")), p.get("files"),
+                           atomic=bool(p.get("atomic", True)),
+                           backup=bool(p.get("backup", False)),
+                           dry_run=bool(p.get("dry_run", False))))
+    local.add(ToolDef(
+        "speed.patch", "Apply many exact/regex edits in one transaction",
+        level=2, timeout=600,
+        schema=obj({
+            "root": text,
+            "edits": {"type": "array", "items": {"type": "object"}},
+            "dry_run": boolean, "backup": boolean, "diff": boolean,
+            "atomic": boolean,
+        }, ["root", "edits"])),
+        lambda p: _s.patch(str(p.get("root", "")), p.get("edits") or [],
+                           dry_run=bool(p.get("dry_run", False)),
+                           backup=bool(p.get("backup", False)),
+                           diff=bool(p.get("diff", True)),
+                           atomic=bool(p.get("atomic", True))))
+    local.add(ToolDef(
+        "speed.search", "All patterns in one repository pass",
+        level=0, timeout=300,
+        schema=obj({
+            "root": text, "patterns": {"type": ["array", "string"]},
+            "dir": text, "globs": {"type": ["array", "string"]},
+            "max_hits": integer, "context": integer,
+            "ignore_case": boolean, "regex": boolean,
+            "include_hidden": boolean,
+        }, ["root", "patterns"])),
+        lambda p: _s.search(str(p.get("root", "")),
+                            p.get("patterns") or p.get("pattern"),
+                            dir=str(p.get("dir", ".")),
+                            globs=p.get("globs") or p.get("glob"),
+                            max_hits=int(p.get("max_hits", 200)),
+                            context=int(p.get("context", 0)),
+                            ignore_case=bool(p.get("ignore_case", False)),
+                            regex=bool(p.get("regex", True)),
+                            include_hidden=bool(p.get("include_hidden", False))))
+    local.add(ToolDef(
+        "speed.context", "Repo tree + selected file contents in one call",
+        level=0, timeout=300,
+        schema=obj({
+            "root": text, "paths": {"type": ["array", "string"]},
+            "query": text, "globs": {"type": ["array", "string"]},
+            "dir": text, "max_files": integer, "max_chars": integer,
+            "max_lines": integer, "include_tree": boolean,
+            "include_hidden": boolean,
+        }, ["root"])),
+        lambda p: _s.context(str(p.get("root", "")),
+                             paths=p.get("paths") or p.get("path"),
+                             query=str(p.get("query", "")),
+                             globs=p.get("globs") or p.get("glob"),
+                             dir=str(p.get("dir", ".")),
+                             max_files=int(p.get("max_files", 24)),
+                             max_chars=int(p.get("max_chars", 160000)),
+                             max_lines=int(p.get("max_lines", 500)),
+                             include_tree=bool(p.get("include_tree", True)),
+                             include_hidden=bool(p.get("include_hidden", False))))
+    local.add(ToolDef(
+        "speed.blueprint", "Create a whole complex structure in one call",
+        level=2, timeout=600,
+        schema=obj({
+            "root": text, "name": text, "template": text, "package": text,
+            "files": {"type": "object"}, "vars": {"type": "object"},
+            "force": boolean, "dry_run": boolean, "backup": boolean,
+            "atomic": boolean,
+        }, ["root"])),
+        lambda p: _s.blueprint(str(p.get("root", "")),
+                               name=str(p.get("name", "Forge App")),
+                               template=str(p.get("template", "python-package")),
+                               package=str(p.get("package", "")),
+                               files=p.get("files"), vars=p.get("vars"),
+                               force=bool(p.get("force", False)),
+                               dry_run=bool(p.get("dry_run", False)),
+                               backup=bool(p.get("backup", False)),
+                               atomic=bool(p.get("atomic", False))))
+    local.add(ToolDef("speed.recipes", "List blueprint recipes", level=0,
+                      schema=obj({})),
+              lambda p: _s.recipes())
+    local.add(ToolDef(
+        "speed.bench", "Measure batch vs one-call speed on this machine",
+        level=1, timeout=900,
+        schema=obj({
+            "root": text, "files": integer, "repeats": integer,
+            "payload": integer, "call_overhead_ms": {"type": "number"},
+        }, ["root"])),
+        lambda p: _s.bench(str(p.get("root", "")),
+                           files=int(p.get("files", 80)),
+                           repeats=int(p.get("repeats", 2)),
+                           payload=int(p.get("payload", 600)),
+                           call_overhead_ms=float(p.get("call_overhead_ms", 2.0))))
+    reg.add_module(ModuleDef(
+        "speed", "Batch writes/patches, context packs, complex blueprints",
+        "0.1.0", ["speed.write", "speed.patch", "speed.search",
+                  "speed.context", "speed.blueprint", "speed.recipes",
+                  "speed.bench"]))
 
 
 def _wire_loop(reg, local) -> None:
@@ -388,6 +534,36 @@ def _wire_kit(reg, local) -> None:
                               "ci.generate", "secrets.scan", "doctor.check",
                               "deps.scan", "audit.run", "init.project",
                               "report.full", "baseline.save", "baseline.check"]))
+
+
+def _wire_factory(reg, local) -> None:
+    """Intent -> built Paper plugin -> live server -> report + zip."""
+    from ..core.registry import ToolDef
+    from ..factory import plan as _plan
+    from ..factory import run as _run
+    local.add(ToolDef("factory.plan",
+                      "Turn an intent into a buildable plugin spec", level=0),
+              lambda p: _plan(str(p.get("intent", "")),
+                              name=str(p.get("name", "")),
+                              package=str(p.get("package", "")),
+                              command=str(p.get("command", ""))))
+    local.add(ToolDef("factory.run",
+                      "Generate, compile, boot a real server, package", level=2,
+                      timeout=1800),
+              lambda p: _run(str(p.get("intent", "")),
+                             out=str(p.get("out", ".")),
+                             name=str(p.get("name", "")),
+                             package=str(p.get("package", "")),
+                             command=str(p.get("command", "")),
+                             build=bool(p.get("build", True)),
+                             e2e=bool(p.get("e2e", True)),
+                             server_jar=str(p.get("server_jar", "")),
+                             api_jar=str(p.get("api_jar", "")),
+                             java_bin=str(p.get("java", "")),
+                             timeout_boot=int(p.get("timeout", 420)),
+                             build_timeout=int(p.get("build_timeout", 600))))
+    reg.add_module(ModuleDef("factory", "Intent-to-plugin factory", "0.1.0",
+                             ["factory.plan", "factory.run"]))
 
 
 def _wire_ui(reg, local) -> None:

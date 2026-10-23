@@ -1,6 +1,6 @@
 # Tool Catalog (generated — do not edit by hand)
 
-SOURCE_OF_TRUTH = registry (60 tools)
+SOURCE_OF_TRUTH = registry (72 tools)
 
 ## audit.run
 - module: kit, backend: local, level: 1
@@ -61,6 +61,14 @@ SOURCE_OF_TRUTH = registry (60 tools)
 ## evolve.check
 - module: evolve, backend: local, level: 0
 - Find stale skills/rules/history
+
+## factory.plan
+- module: factory, backend: local, level: 0
+- Turn an intent into a buildable plugin spec
+
+## factory.run
+- module: factory, backend: local, level: 2
+- Generate, compile, boot a real server, package
 
 ## forge.ping
 - module: core, backend: local, level: 0
@@ -222,6 +230,34 @@ SOURCE_OF_TRUTH = registry (60 tools)
 - module: kit, backend: local, level: 0
 - Scan for leaked secrets (masked output)
 
+## speed.bench
+- module: speed, backend: local, level: 1
+- Measure batch vs one-call speed on this machine
+
+## speed.blueprint
+- module: speed, backend: local, level: 2
+- Create a whole complex structure in one call
+
+## speed.context
+- module: speed, backend: local, level: 0
+- Repo tree + selected file contents in one call
+
+## speed.patch
+- module: speed, backend: local, level: 2
+- Apply many exact/regex edits in one transaction
+
+## speed.recipes
+- module: speed, backend: local, level: 0
+- List blueprint recipes
+
+## speed.search
+- module: speed, backend: local, level: 0
+- All patterns in one repository pass
+
+## speed.write
+- module: speed, backend: local, level: 2
+- Write many files in one call (atomic rollback)
+
 ## test.detect
 - module: kit, backend: local, level: 0
 - Detect the project's native test command
@@ -241,3 +277,15 @@ SOURCE_OF_TRUTH = registry (60 tools)
 ## ui.validate_layout
 - module: ui, backend: local, level: 0
 - Inventory slot/action/text checks
+
+## web.audit
+- module: webstudio, backend: local, level: 0
+- Audit a generated site (structure/contrast/motion)
+
+## web.generate
+- module: webstudio, backend: local, level: 1
+- Generate an animated static site (no deps)
+
+## web.presets
+- module: webstudio, backend: local, level: 0
+- List Web Studio presets

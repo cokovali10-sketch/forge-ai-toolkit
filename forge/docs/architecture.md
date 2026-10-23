@@ -10,8 +10,8 @@ agent/CLI/MCP-client
 └───────┬───────────┬───────────┘
         │           │
         ▼           ▼
- project/ lab/ ui/ bench/   knowledge/   skills/   quality/
-(sandboxed) (server) (PIL)  (SQLite FTS) (SKILL.md) (review)
+ project/ lab/ ui/ bench/   knowledge/   skills/   quality/   speed/
+(sandboxed) (server) (PIL)  (SQLite FTS) (SKILL.md) (review)  (batch I/O)
         │           │
         ▼           ▼
   Anvil (subprocess)   Hermes (http, optional)
@@ -32,6 +32,10 @@ agent/CLI/MCP-client
 - **Deterministic UI work.** Briefs/strategies/validators are keyword- and
   math-driven (no model needed); screenshots are declared out of scope until
   a client harness exists.
+- **Fewer round-trips, same guarantees.** The `speed` department batches writes,
+  edits, searches and context reads into one call each; atomic batches roll
+  back, paths stay confined, and `speed.bench` reports disk and effective time
+  separately instead of claiming a win.
 
 ## Data flow (typical task)
 

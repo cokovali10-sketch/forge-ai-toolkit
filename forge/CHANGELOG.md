@@ -1,6 +1,30 @@
 # Changelog
 
 ## Unreleased
+- speed: new `speed` department — `forge fast write|patch|search|context|
+  blueprint|recipes|bench` and MCP tools `speed.*`: one call writes many files
+  atomically, applies many exact/regex edits in one transaction, searches all
+  patterns in one file pass, returns a tree + selected file contents as a
+  context pack, and scaffolds complex structures from recipes
+  (`python-package`, `layered`, `http-service`, `plugin-feature`, `custom`);
+  `speed.bench` measures the win (80 files: 3.60x write, 2.11x atomic write,
+  2.16x patch, 3.27x search on the reference machine at 2 ms/call)
+- speed: `speed-coder` skill + `speed` module pack; `forge do` adds
+  `speed-context` / `speed-batch` steps for speed/structure intents
+- studio: `forge studio [--port 8100] [--open] [--store FILE]` — a local
+  multi-project workspace: project registry (`.forge-studio.json`), audit
+  dashboard, pipeline runner with per-stage status, web/Paper generators with
+  live preview, HTML/JSON report export; API only for registered paths;
+  `forge studio list|add PATH`; stdlib only, localhost only
+- factory: `forge factory "<intent>"` — intent → plugin spec → generated GUI
+  plugin → real `javac` build → boot on a real Purpur server → e2e checks →
+  `dist/*.zip` + `FACTORY.md`; honest PASS/PARTIAL/FAIL/SKIPPED stages;
+  MCP `factory.plan` / `factory.run`
+- webstudio: `forge web presets|new|audit|preview` — 6 animated landing
+  presets (aurora/neon/glass/brutalist/minimal/retro), dependency-free motion
+  (reveal, tilt, magnet, cursor glow, counters, parallax, particles),
+  RU/EN content, WCAG contrast check and a 0..100 site audit; MCP `web.*`;
+  `forge gen web --preset/--tagline/--lang` now delegates to Web Studio
 - refactor: `forge fix [dir]` (`refactor.fix_dir`) — batch safe auto-fixes
   across all `.py` at once (unused imports, magic numbers, `== None`);
   tests run once, one rollback covers every changed file; `forge refactor

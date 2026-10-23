@@ -34,7 +34,7 @@ no paid APIs, no hallucinated results — only verifiable tools.*
 
 A regular AI agent can reason but has no hands: it cannot build a project,
 run tests against a real server, or check 500 files in a second.
-FORGE is the hands: **32 native tools + 120 Anvil tools + ~200 Hermes tools**
+FORGE is the hands: **72 native tools + 120 Anvil tools + ~200 Hermes tools**
 behind one CLI and one MCP server.
 
 Two modes of the same conveyor:
@@ -136,6 +136,10 @@ builds and writes — 2. The client decides what the agent may do.
 | `forge edit inspect/get/set/validate/rollback` | object editor (native JSON, YAML via Anvil) |
 | `forge evolve` | what is stale and who should fix it |
 | `forge gen web/python-service/go-cli/node-api/rust-cli/paper` | project generators (landing, microservice, Go/Node/Rust, Paper plugin) |
+| `forge fast write\|patch\|search\|context\|blueprint` | Speed: batch write/edit, one-pass search, context pack, blueprints |
+| `forge web presets\|new\|audit\|preview` | Web Studio: 6 animated presets, 0..100 site audit, preview |
+| `forge factory "<intent>"` | factory: intent → GUI plugin → javac → Purpur e2e → zip |
+| `forge studio [--port 8100] [--open]` | multi-project browser workspace: audit, pipeline, generators |
 | `forge make <kind> <name> [out]` | generator + conveyor check in one shot |
 | `forge map <dir>` | project map: languages and LOC, entry points, import graph, deps |
 | `forge test <dir>` | universal test runner (pytest/npm/go/cargo/gradle/maven/make) |
@@ -274,6 +278,85 @@ and verdict. Agents get it in one call via `report.full`.
 Export to a file: `forge report . --html report.html` — a standalone HTML page
 (the same dashboard, data embedded; handy to attach to a PR).
 
+## Studio: `forge studio`
+
+`forge serve` shows **one** project. `forge studio` is a workspace for many:
+a project registry (`.forge-studio.json`) on the left, tabs for Overview,
+Pipeline, Quality, Generator and Reports on the right. Run the conveyor and see
+each stage's status, generate a site or a Paper plugin with a live preview, and
+download a standalone HTML report.
+
+```bat
+forge studio list                       :: what is already registered
+forge studio add D:\work\my-project     :: add a project
+forge studio --open --port 8100         :: open the studio
+```
+
+API: `GET /api/studio`, `GET /api/report`, `GET /api/pipeline/history`,
+`POST /api/projects`, `POST /api/pipeline/run`, `POST /api/gen`, `/preview`.
+Only `127.0.0.1`; only paths from the registry and `studio-workspace/` can be
+read, generated into, or previewed; `..` escapes are rejected.
+
+## Speed: `forge fast` (the Speed department)
+
+The agent's bottleneck is rarely typing — it is the number of calls: one file
+per call, one search per pattern, one read per file. `forge fast` removes that:
+
+```bat
+forge fast context --root . --query "class .*Service" --json
+forge fast search --root . --pattern TODO --pattern FIXME
+forge fast write --root . --spec files.json      :: many files, one transaction
+forge fast patch --root . --spec edits.json      :: many edits, one transaction
+forge fast blueprint --root D:\work\shop --template plugin-feature --name "Shop"
+forge fast bench --root . --files 80             :: honest measurement here
+```
+
+| Tool | What it does |
+|---|---|
+| `speed.write` | many files in one call, atomic rollback, `base64`, `append`, `dry_run` |
+| `speed.patch` | many exact/regex edits, `expected=N`, `all`, diff, atomic |
+| `speed.search` | all patterns in one file pass, context lines, secrets scrubbed |
+| `speed.context` | tree + selected files in one response, with a char/token budget |
+| `speed.blueprint` | whole structure: `python-package`, `layered`, `http-service`, `plugin-feature`, `custom` |
+| `speed.bench` | disk time and effective time with a simulated per-call round-trip |
+
+Reference machine (80 files, 2 ms/call): write **3.60x**, atomic write
+**2.11x**, batch patch **2.16x**, four searches in one pass **3.27x**. Batch
+disk time can be higher — the win is removing round-trips; run
+`forge fast bench` instead of trusting the table.
+
+Rules: explicit `root`; `..`, drive roots, system directories and `.git` are
+refused; edits are atomic by default; `atomic=false` only for a fresh generated
+tree. Details: [docs/speed.md](./docs/speed.md).
+
+## Web Studio: `forge web`
+
+```bat
+forge web presets                          :: aurora/neon/glass/brutalist/minimal/retro
+forge web new "Aurora" --preset aurora --tagline "Sites that move"
+forge web audit site --json                :: structure, WCAG contrast, JS, weight
+forge web preview site --open              :: local preview
+```
+
+A site is just `index.html`, `styles.css`, `app.js` — no CDN, no dependencies:
+reveal animations, tilt, magnet, cursor glow, counters, parallax, particles and
+a `prefers-reduced-motion` guard. `forge gen web` uses the same engine and
+accepts `--preset/--tagline/--lang`.
+
+## Plugin factory: `forge factory`
+
+```bat
+forge factory "shop with a GUI and animations" --out D:\work
+forge factory plan "player kits" --json
+forge factory "auction" --no-e2e            :: build only, no server
+```
+
+Pipeline: `generate → validate → resourcepack (when asked) → build (javac
+against paper-api) → e2e (real Purpur: boot, plugin load, command) → package
+(zip)`. Each stage honestly reports `PASS/PARTIAL/FAIL/SKIPPED` with a reason;
+overall `PASS` only when everything really ran. Output: `factory-report.json`,
+`FACTORY.md`, `dist/<Name>-<version>-forge.zip`.
+
 ## Hold the line: `forge baseline`
 
 On a large legacy codebase the audit immediately shows hundreds of findings, so
@@ -344,7 +427,8 @@ reason (`.forge-suppress.json`), line-level via `# forge-ignore`.
 Now: core, conveyor (8 stages), lab, 5 languages, editor, generators (`web`,
 `python-service`, `go-cli`, `node-api`, `rust-cli`, `paper`) + `make`, the
 `map`/`test`/`ci`/`secrets`/`deps`/`doctor` arsenal, the `refactor` advisor, the
-`do`/`loop`/`quality` autopilot, a first arena entry (reference 3/3), 197 green
+`do`/`loop`/`quality` autopilot, the `speed` department (batch files/edits,
+context packs, blueprints), a first arena entry (reference 3/3), 233 green
 tests.
 Honestly not done: desktop app (needs Rust for Tauri - no cargo on this machine),
 GUI screenshots, auto-client — marked `NOT_IMPLEMENTED`.

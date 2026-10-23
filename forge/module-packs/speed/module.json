@@ -1,0 +1,35 @@
+{
+  "id": "speed",
+  "name": "Speed Department",
+  "version": "0.1.0",
+  "description": "Batch file writes and patches, context packs, complex project blueprints and speed benchmarks: fewer agent round-trips, more code per call.",
+  "tech": ["python", "java", "typescript", "go", "rust", "any", "быстро", "скорость", "структура", "файлы"],
+  "capabilities": [
+    "write many files in one atomic call",
+    "apply many edits in one transaction",
+    "multi-pattern repository search in one pass",
+    "context pack with tree and file contents",
+    "complex project scaffolds (python package, layered app, HTTP service, Paper feature pack)",
+    "measure batch speedup"
+  ],
+  "deps": [],
+  "instructions": "Use speed.write instead of one write per file; speed.patch instead of repeated edit calls; speed.context before reading files one by one; speed.blueprint to create a whole structure. Always run a build/test after a batch and prefer dry_run for risky patches.",
+  "knowledge": [],
+  "tools": [
+    "speed.write",
+    "speed.patch",
+    "speed.search",
+    "speed.context",
+    "speed.blueprint",
+    "speed.recipes",
+    "speed.bench"
+  ],
+  "limits": [
+    "writes stay inside an explicit root",
+    "no .git writes",
+    "atomic rollback on a failed batch"
+  ],
+  "permissions": ["write", "read"],
+  "tests": ["forge fast bench --root . --files 40"],
+  "compat": ["forge>=0.13"]
+}

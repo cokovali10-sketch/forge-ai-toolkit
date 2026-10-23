@@ -19,3 +19,8 @@
 - Paper/Spigot/Purpur/Fabric development: versions, APIs, GUIs, configs
 - capabilities: scaffold plugin, version compatibility check, metadata lint, permission audit, config check, listener analysis, gui design review
 - tools: project.inspect, minecraft.validate_plugin_metadata, minecraft.check_permissions
+
+## speed v0.1.0 — Speed Department
+- Batch file writes and patches, context packs, complex project blueprints and speed benchmarks: fewer agent round-trips, more code per call.
+- capabilities: write many files in one atomic call, apply many edits in one transaction, multi-pattern repository search in one pass, context pack with tree and file contents, complex project scaffolds (python package, layered app, HTTP service, Paper feature pack), measure batch speedup
+- tools: speed.write, speed.patch, speed.search, speed.context, speed.blueprint, speed.recipes, speed.bench

@@ -17,6 +17,8 @@ quality-history/
 .forge-fix.json
 .forge-pipe-history.jsonl
 forge-pipe-report.json
+.forge-studio.json
+studio-workspace/
 
 # Editors / OS
 .vscode/

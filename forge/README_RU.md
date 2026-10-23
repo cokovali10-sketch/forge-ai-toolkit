@@ -34,7 +34,7 @@
 
 Обычный ИИ-агент умеет рассуждать, но у него нет рук: он не соберёт проект,
 не погоняет тесты на настоящем сервере, не проверит 500 файлов за секунду.
-FORGE — это руки: **32 своих инструмента + 120 инструментов Anvil + ~200
+FORGE — это руки: **72 своих инструмента + 120 инструментов Anvil + ~200
 инструментов Hermes** за одним CLI и одним MCP-сервером.
 
 Два режима использования одного и того же конвейера:
@@ -136,6 +136,10 @@ FORGE — это MCP-сервер на stdio (проверен официаль�
 | `forge edit inspect/get/set/validate/rollback` | редактор объектов (JSON свой, YAML через Anvil) |
 | `forge evolve` | что протухло и кому чинить |
 | `forge gen web/python-service/go-cli/node-api/rust-cli/paper` | генераторы проектов (лендинг, микросервис, Go/Node/Rust, Paper-плагин) |
+| `forge fast write\|patch\|search\|context\|blueprint` | Speed: пакетная запись/правка, поиск одним проходом, контекст, каркасы |
+| `forge web presets\|new\|audit\|preview` | Web Studio: 6 анимированных пресетов, аудит сайта 0..100, превью |
+| `forge factory "<намерение>"` | фабрика: намерение → GUI-плагин → javac → Purpur e2e → zip |
+| `forge studio [--port 8100] [--open]` | многопроектная студия в браузере: аудит, пайплайн, генераторы |
 | `forge make <тип> <имя> [out]` | генератор + проверка конвейером одним вызовом |
 | `forge map <dir>` | карта проекта: языки и LOC, точки входа, граф импортов, зависимости |
 | `forge test <dir>` | универсальный запуск тестов (pytest/npm/go/cargo/gradle/maven/make) |
@@ -274,6 +278,85 @@ API: `GET /api/report[?deep=1]` — полный свод; `GET /api/health` —
 Экспорт в файл: `forge report . --html report.html` — автономная HTML-страница
 (тот же дашборд, данные внутри; удобно приложить к PR).
 
+## Студия в браузере: `forge studio`
+
+`forge serve` показывает **один** проект. `forge studio` — рабочее место над
+несколькими: слева реестр проектов (`.forge-studio.json`), справа вкладки
+«Обзор», «Пайплайн», «Качество», «Генератор», «Отчёты». Из интерфейса можно
+запустить конвейер и увидеть статус каждого этапа, сгенерировать сайт или
+Paper-плагин с превью, скачать автономный HTML-отчёт.
+
+```bat
+forge studio list                       :: что уже добавлено
+forge studio add D:\work\my-project     :: добавить проект в реестр
+forge studio --open --port 8100         :: открыть студию
+```
+
+API: `GET /api/studio`, `GET /api/report`, `GET /api/pipeline/history`,
+`POST /api/projects`, `POST /api/pipeline/run`, `POST /api/gen`, `/preview`.
+Только `127.0.0.1`; читать, генерировать и показывать можно **только** пути из
+реестра и `studio-workspace/` — обход через `..` отклоняется.
+
+## Скорость: `forge fast` (отдел Speed)
+
+Главный тормоз агента — не набор текста, а число вызовов: один файл за вызов,
+один поиск на шаблон, одно чтение на файл. `forge fast` убирает это:
+
+```bat
+forge fast context --root . --query "class .*Service" --json
+forge fast search --root . --pattern TODO --pattern FIXME
+forge fast write --root . --spec files.json      :: много файлов одной транзакцией
+forge fast patch --root . --spec edits.json      :: много правок одной транзакцией
+forge fast blueprint --root D:\work\shop --template plugin-feature --name "Shop"
+forge fast bench --root . --files 80             :: честный замер на этой машине
+```
+
+| Инструмент | Что делает |
+|---|---|
+| `speed.write` | много файлов за вызов, атомарный откат, `base64`, `append`, `dry_run` |
+| `speed.patch` | много exact/regex-правок, `expected=N`, `all`, diff, атомарно |
+| `speed.search` | все шаблоны за один проход по файлам, контекст, секреты вычищаются |
+| `speed.context` | дерево + нужные файлы одним ответом, с бюджетом токенов |
+| `speed.blueprint` | каркас целиком: `python-package`, `layered`, `http-service`, `plugin-feature`, `custom` |
+| `speed.bench` | замер: диск и «эффективное» время с учётом round-trip |
+
+Замер на референсной машине (80 файлов, 2 мс на вызов): запись **3.60x**,
+атомарная запись **2.11x**, пакетные правки **2.16x**, 4 поиска за один проход
+**3.27x**. Диск в батче может быть медленнее — выигрыш в устранении вызовов;
+цифры проверяются `forge fast bench`, а не принимаются на веру.
+
+Правила: `root` явный; `..`, корни дисков, системные папки и `.git`
+запрещены; правки по умолчанию атомарные; `atomic=false` — только для свежего
+сгенерированного дерева. Подробности: [docs/speed.md](./docs/speed.md).
+
+## Web Studio: `forge web`
+
+```bat
+forge web presets                          :: aurora/neon/glass/brutalist/minimal/retro
+forge web new "Aurora" --preset aurora --tagline "Сайты, которые двигаются"
+forge web audit site --json                :: структура, контраст WCAG, JS, вес
+forge web preview site --open              :: локальный предпросмотр
+```
+
+Сайт собирается из `index.html`, `styles.css`, `app.js` без CDN и зависимостей:
+reveal-анимации, tilt, magnet, glow за курсором, счётчики, параллакс, частицы,
+`prefers-reduced-motion`. `forge gen web` использует тот же движок и принимает
+`--preset/--tagline/--lang`.
+
+## Фабрика плагинов: `forge factory`
+
+```bat
+forge factory "магазин с GUI и анимациями" --out D:\work
+forge factory plan "кейсы для игроков" --json
+forge factory "аукцион" --no-e2e           :: только сборка, без сервера
+```
+
+Конвейер: `generate → validate → resourcepack (если просили) → build (javac
+против paper-api) → e2e (настоящий Purpur, вход, загрузка плагина, команда) →
+package (zip)`. Каждый этап честно получает `PASS/PARTIAL/FAIL/SKIPPED` с
+причиной; итог `PASS` — только когда всё реально прошло. Результат:
+`factory-report.json`, `FACTORY.md`, `dist/<Name>-<version>-forge.zip`.
+
 ## Держать линию: `forge baseline`
 
 На большом легаси-коде аудит сразу показывает сотни замечаний, и честный гейт
@@ -344,8 +427,8 @@ forge fix . --test "python -m pytest -q"   :: с проверкой и общи�
 Сейчас: ядро, конвейер (8 стадий), лаборатория, 5 языков, редактор, генераторы
 (`web`, `python-service`, `go-cli`, `node-api`, `rust-cli`, `paper`) + `make`,
 арсенал `map`/`test`/`ci`/`secrets`/`deps`/`doctor`, советник `refactor`,
-автопилот `do`/`loop`/`quality`, первая запись арены (fixture 3/3), 197 тестов
-— зелёные.
+автопилот `do`/`loop`/`quality`, отдел `speed` (пакетные файлы и правки,
+контекст, каркасы), первая запись арены (fixture 3/3), 233 теста — зелёные.
 Честно не готово: десктоп-приложение (нужен Rust для Tauri — на машине нет
 cargo), скриншоты GUI, автоклиент — помечены `NOT_IMPLEMENTED`.
 Дальше: публикация на PyPI (metadata и workflow готовы; нужен твой

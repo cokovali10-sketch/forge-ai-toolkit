@@ -62,6 +62,11 @@ _GENERATOR_DOMAINS: dict[str, tuple[str, ...]] = {
 _AUDIT_WORDS = ("аудит", "проверь", "проверить", "оцени", "оценка", "здоров",
                 "audit", "health", "утечк", "зависимост")
 
+# Намерения, где важна скорость создания/правки большого числа файлов.
+_SPEED_WORDS = ("быстро", "скорост", "batch", "пакет", "массов", "много файл",
+                "структур", "scaffold", "blueprint", "каркас", "много код",
+                "создай проект", "создать проект")
+
 
 def _tokens(text: str) -> set[str]:
     import re
@@ -150,11 +155,17 @@ def plan(intent: str, root: str, forge_root: str,
     skills = _match_skills(intent, forge_root, kind)
     knowledge = _knowledge(intent, forge_root)
     steps: list[dict[str, Any]] = []
-    if any(w in intent.lower() for w in _AUDIT_WORDS):
+    low = intent.lower()
+    if any(w in low for w in _AUDIT_WORDS):
         steps.append({"step": "audit",
                       "command": f"forge audit \"{root}\"",
                       "why": "сводная проверка: карта, секреты, зависимости, "
                              "качество"})
+    speed_mode = any(w in low for w in _SPEED_WORDS)
+    if speed_mode:
+        steps.append({"step": "speed-context",
+                      "command": f"forge fast context --root \"{root}\" --json",
+                      "why": "один вызов вместо чтения файлов по одному"})
     if kind:
         steps.append({"step": "generate",
                       "command": f"forge make {kind} {name} --out \"{root}\"",
@@ -170,13 +181,18 @@ def plan(intent: str, root: str, forge_root: str,
         steps.append({"step": "follow-skills",
                       "command": "forge skills list",
                       "why": "процедуры: " + ", ".join(s["skill"] for s in skills)})
+    if speed_mode:
+        steps.append({"step": "speed-batch",
+                      "command": "forge fast recipes",
+                      "why": "blueprint для структуры, speed.write/speed.patch "
+                             "для пакетных изменений"})
     steps.append({"step": "verify", "command": f"forge pipe run \"{root}\"",
                   "why": "проверить результат конвейером"})
     steps.append({"step": "auto-fix", "command": f"forge loop \"{root}\"",
                   "why": "довести до зелёного автоматически"})
     return {"intent": intent, "root": root, "generator": kind,
             "modules": modules, "skills": skills, "knowledge": knowledge,
-            "steps": steps}
+            "speed": speed_mode, "steps": steps}
 
 
 def run(intent: str, root: str, forge_root: str, name: str = "demo",

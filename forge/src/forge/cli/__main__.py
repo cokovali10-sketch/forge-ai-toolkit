@@ -86,6 +86,8 @@ def _gen(args: list[str]) -> int:
         print("usage: forge gen paper --name X [--package P] [--command C] [--out DIR]")
         print("       forge gen web|python-service|go-cli|node-api|rust-cli "
               "--name X --out DIR")
+        print("       forge gen web ... [--preset aurora|neon|glass|brutalist|"
+              "minimal|retro] [--tagline \"...\"] [--lang ru|en]")
         return 0
     if args[0] in ("web", "python-service", "go-cli", "node-api", "rust-cli"):
         import json as _json
@@ -98,7 +100,13 @@ def _gen(args: list[str]) -> int:
         mod = {"web": _w, "python-service": _p, "go-cli": _g,
                "node-api": _n, "rust-cli": _r}[args[0]]
         try:
-            res = mod.generate(o["out"], o.get("name", "demo"))
+            if args[0] == "web":
+                res = mod.generate(o["out"], o.get("name", "demo"),
+                                   preset=o.get("preset", "aurora"),
+                                   tagline=o.get("tagline", ""),
+                                   lang=o.get("lang", "ru"))
+            else:
+                res = mod.generate(o["out"], o.get("name", "demo"))
         except (ValueError, OSError) as e:
             print(f"bad options: {e}")
             return 2
@@ -125,6 +133,447 @@ def _gen(args: list[str]) -> int:
         return 2
     print(_json.dumps(res, ensure_ascii=False, indent=2))
     return 0
+
+
+def _fast(args: list[str]) -> int:
+    """forge fast: batch writes/patches, context packs, blueprints."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.speed import api as _s
+    usage = """usage:
+  forge fast write --root DIR --spec FILE|--data JSON|--stdin [--json]
+  forge fast patch --root DIR --spec FILE [--dry-run] [--json]
+  forge fast search --root DIR --pattern RE [--pattern RE] [--json]
+  forge fast context --root DIR [--path P] [--query RE] [--pack|--json]
+  forge fast blueprint --root DIR --template T --name N [--force]
+  forge fast recipes [--json]
+  forge fast bench --root DIR [--files N] [--repeats N] [--overhead MS]"""
+    if not args or args[0] in ("-h", "--help", "help"):
+        print(usage)
+        return 0
+    sub = args[0]
+    rest = args[1:]
+    opts: dict[str, str] = {}
+    multi: dict[str, list[str]] = {}
+    pos: list[str] = []
+    bools = {"json", "stdin", "dry_run", "no_diff", "no_tree", "ignore_case",
+             "literal", "hidden", "force", "backup", "atomic", "no_atomic",
+             "pack", "help"}
+    takes = {"root", "spec", "data", "template", "name", "package", "query",
+             "dir", "max_hits", "context", "max_files", "max_chars",
+             "max_lines", "files", "repeats", "payload", "overhead"}
+    i = 0
+    while i < len(rest):
+        a = rest[i]
+        if a.startswith("--"):
+            key = a[2:].replace("-", "_")
+            if key in ("pattern", "path", "glob"):
+                if i + 1 < len(rest) and not rest[i + 1].startswith("--"):
+                    multi.setdefault(key, []).append(rest[i + 1])
+                    i += 2
+                else:
+                    i += 1
+            elif key in bools:
+                opts[key] = "1"
+                i += 1
+            elif key in takes or (i + 1 < len(rest)
+                                  and not rest[i + 1].startswith("--")):
+                if i + 1 >= len(rest):
+                    print(f"fast: --{key} needs a value")
+                    return 2
+                opts[key] = rest[i + 1]
+                i += 2
+            else:
+                opts[key] = "1"
+                i += 1
+        else:
+            pos.append(a)
+            i += 1
+
+    def payload():
+        try:
+            if opts.get("spec"):
+                return _json.loads(Path(opts["spec"]).read_text(encoding="utf-8"))
+            if opts.get("data"):
+                return _json.loads(opts["data"])
+            if "stdin" in opts:
+                return _json.loads(sys.stdin.read() or "{}")
+        except (OSError, ValueError) as e:
+            raise ValueError(f"cannot read spec: {e}") from e
+        return {}
+
+    def root_of(data) -> str:
+        if opts.get("root"):
+            return opts["root"]
+        if isinstance(data, dict):
+            return str(data.get("root", ""))
+        return ""
+
+    try:
+        if sub == "write":
+            data = payload()
+            root = root_of(data)
+            files = data.get("files") if isinstance(data, dict) else None
+            if files is None and isinstance(data, dict) and data:
+                files = {k: v for k, v in data.items() if k != "root"}
+            if not root or files is None:
+                print(usage)
+                return 2
+            res = _s.write(root, files,
+                           atomic="no_atomic" not in opts,
+                           backup="backup" in opts,
+                           dry_run="dry_run" in opts)
+        elif sub == "patch":
+            data = payload()
+            root = root_of(data)
+            edits = data if isinstance(data, list) else (
+                data.get("edits") if isinstance(data, dict) else None)
+            if not root or not edits:
+                print(usage)
+                return 2
+            res = _s.patch(root, edits,
+                           dry_run="dry_run" in opts,
+                           backup="backup" in opts,
+                           diff="no_diff" not in opts,
+                           atomic="no_atomic" not in opts)
+        elif sub == "search":
+            patterns = multi.get("pattern", [])
+            if opts.get("pattern"):
+                patterns.append(opts["pattern"])
+            if not patterns:
+                patterns = pos
+            root = opts.get("root", "")
+            if not root or not patterns:
+                print(usage)
+                return 2
+            res = _s.search(root, patterns,
+                            dir=opts.get("dir", "."),
+                            globs=multi.get("glob"),
+                            max_hits=int(opts.get("max_hits", 200)),
+                            context=int(opts.get("context", 0)),
+                            ignore_case="ignore_case" in opts,
+                            regex="literal" not in opts,
+                            include_hidden="hidden" in opts)
+        elif sub == "context":
+            root = opts.get("root", "")
+            if not root:
+                print(usage)
+                return 2
+            res = _s.context(root, paths=multi.get("path") or None,
+                             query=opts.get("query", ""),
+                             globs=multi.get("glob"),
+                             dir=opts.get("dir", "."),
+                             max_files=int(opts.get("max_files", 24)),
+                             max_chars=int(opts.get("max_chars", 160000)),
+                             max_lines=int(opts.get("max_lines", 500)),
+                             include_tree="no_tree" not in opts,
+                             include_hidden="hidden" in opts)
+        elif sub == "blueprint":
+            data = payload()
+            root = root_of(data)
+            name = (opts.get("name") or (pos[0] if pos else "")
+                    or (data.get("name") if isinstance(data, dict) else "")
+                    or "Forge App")
+            template = (opts.get("template")
+                        or (data.get("template") if isinstance(data, dict) else "")
+                        or "python-package")
+            package = (opts.get("package")
+                       or (data.get("package") if isinstance(data, dict) else "")
+                       or "")
+            if not root:
+                print(usage)
+                return 2
+            res = _s.blueprint(root, name=name, template=template,
+                               package=package,
+                               files=data.get("files") if isinstance(data, dict) else None,
+                               vars=data.get("vars") if isinstance(data, dict) else None,
+                               force="force" in opts,
+                               dry_run="dry_run" in opts,
+                               backup="backup" in opts,
+                               atomic="atomic" in opts)
+        elif sub == "recipes":
+            res = _s.recipes()
+            if "json" in opts:
+                print(_json.dumps(res, ensure_ascii=False, indent=2))
+            else:
+                for r in res["recipes"]:
+                    print(f"{r['key']:16} {r['lang']:8} {r['title']}: "
+                          f"{r['description']}")
+            return 0
+        elif sub == "bench":
+            root = opts.get("root", "")
+            if not root:
+                print(usage)
+                return 2
+            res = _s.bench(root,
+                           files=int(opts.get("files", 80)),
+                           repeats=int(opts.get("repeats", 2)),
+                           payload=int(opts.get("payload", 600)),
+                           call_overhead_ms=float(opts.get("overhead", 2.0)))
+            print(_json.dumps(res, ensure_ascii=False, indent=2))
+            return 0 if res.get("ok") else 1
+        else:
+            print(f"fast: unknown command {sub!r}\n{usage}")
+            return 2
+    except (ValueError, OSError, PermissionError, KeyError) as e:
+        print(f"fast: {e}")
+        return 2
+    if "json" in opts:
+        print(_json.dumps(res, ensure_ascii=False, indent=2))
+        return 0 if res.get("ok") else 1
+    if sub == "context" and "pack" in opts:
+        print(res.get("tree", ""))
+        for f in res.get("files", []):
+            print(f"\n### {f['path']}\n{f['content']}")
+        return 0 if res.get("ok") else 1
+    if sub == "search":
+        for pat, hits in (res.get("hits") or {}).items():
+            print(f"## {pat} ({len(hits)})")
+            for h in hits:
+                print(f"{h['file']}:{h['line']}: {h['text']}")
+        print(f"\n{res.get('total', 0)} hits | "
+              f"{res.get('files_scanned', 0)} files | "
+              f"{res.get('elapsed_ms', 0)}ms")
+        return 0 if res.get("ok") else 1
+    if sub in ("write", "patch", "blueprint"):
+        print(f"{sub}: {'ok' if res.get('ok') else 'FAIL'} | "
+              f"{res.get('files', 0)} files | {res.get('duration_ms', 0)}ms")
+        for w in res.get("written", []):
+            print(f"  {w.get('status', 'written'):8} {w.get('path')}")
+        for p in res.get("would_write", [])[:80]:
+            print(f"  would  {p}")
+        for s in res.get("skipped", [])[:80]:
+            print(f"  skip   {s}")
+        for e in res.get("errors", []):
+            print(f"  ERROR  {e}")
+        return 0 if res.get("ok") else 1
+    print(_json.dumps(res, ensure_ascii=False, indent=2))
+    return 0 if res.get("ok") else 1
+
+
+def _factory(args: list[str]) -> int:
+    """forge factory "<intent>" — плагин от идеи до живого сервера."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.factory import plan as _plan
+    from forge.factory import render_text as _render
+    from forge.factory import run as _run
+    if not args or args[0] in ("-h", "--help", "help"):
+        print('usage: forge factory "<intent>" [--out DIR] [--name N] '
+              '[--package P] [--command C]')
+        print("       [--no-build] [--no-e2e] [--server-jar P] [--api-jar P] "
+              "[--java P] [--json]")
+        print("       forge factory plan \"<intent>\"")
+        return 0
+    sub = args[0] if args[0] == "plan" else ""
+    rest = args[1:] if sub else args
+    opts: dict[str, str] = {}
+    pos: list[str] = []
+    i = 0
+    while i < len(rest):
+        a = rest[i]
+        if a.startswith("--"):
+            key = a[2:].replace("-", "_")
+            if i + 1 < len(rest) and not rest[i + 1].startswith("--"):
+                opts[key] = rest[i + 1]
+                i += 2
+            else:
+                opts[key] = "1"
+                i += 1
+        else:
+            pos.append(a)
+            i += 1
+    intent = " ".join(pos).strip()
+    if not intent:
+        print("factory: нужен intent, например: "
+              "\"плагин магазин с GUI\"")
+        return 2
+    try:
+        if sub == "plan":
+            spec = _plan(intent, name=opts.get("name", ""),
+                         package=opts.get("package", ""),
+                         command=opts.get("command", ""))
+            if "json" in opts:
+                print(_json.dumps(spec, ensure_ascii=False, indent=2))
+            else:
+                print(_render(spec))
+            return 0
+        res = _run(intent, out=opts.get("out", "."),
+                   name=opts.get("name", ""),
+                   package=opts.get("package", ""),
+                   command=opts.get("command", ""),
+                   build="no_build" not in opts,
+                   e2e="no_e2e" not in opts,
+                   server_jar=opts.get("server_jar", ""),
+                   api_jar=opts.get("api_jar", ""),
+                   java_bin=opts.get("java", ""),
+                   timeout_boot=int(opts.get("timeout") or 420),
+                   build_timeout=int(opts.get("build_timeout") or 600))
+    except (ValueError, OSError) as e:
+        print(f"factory: {e}")
+        return 2
+    if "json" in opts:
+        print(_json.dumps(res, ensure_ascii=False, indent=2))
+    else:
+        print(f"factory: {res['status']} · {res['spec']['name']} "
+              f"· {res['duration_ms']}мс")
+        for st in res["stages"]:
+            print(f"  {st['status']:7} {st['name']:13} {st['detail'][:120]}")
+        print(f"  dir:  {res['dir']}")
+        if res.get("jar"):
+            print(f"  jar:  {res['jar']}")
+        if res.get("zip"):
+            print(f"  zip:  {res['zip']}")
+        if res.get("report"):
+            print(f"  report: {res['report']}")
+        for note in res.get("notes", []):
+            print(f"  note: {note}")
+    return 0 if res["ok"] else 1
+
+
+def _studio(args: list[str]) -> int:
+    """forge studio [list|add PATH] [--port 8100] [--open] [--store FILE]."""
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.studio import DEFAULT_STORE, Store
+    from forge.studio import serve as _serve
+    if args and args[0] in ("-h", "--help", "help"):
+        args = []
+    opts: dict[str, str] = {}
+    pos: list[str] = []
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a.startswith("--"):
+            key = a[2:].replace("-", "_")
+            if i + 1 < len(args) and not args[i + 1].startswith("--"):
+                opts[key] = args[i + 1]
+                i += 2
+            else:
+                opts[key] = "1"
+                i += 1
+        else:
+            pos.append(a)
+            i += 1
+    if not pos or pos[0] in ("help", "serve", "start"):
+        if pos and pos[0] in ("help", "serve", "start"):
+            pos = pos[1:]
+        if not args or not pos and not args:
+            print("usage: forge studio [--port 8100] [--open] [--store FILE]")
+            print("       forge studio list [--store FILE]")
+            print("       forge studio add PATH [--name NAME] [--store FILE]")
+            if not args:
+                return 0
+        root = opts.get("workspace")
+        port = int(opts.get("port", "8100") or 8100)
+        return _serve(port=port, open_browser="open" in opts,
+                      store_path=opts.get("store", DEFAULT_STORE),
+                      **({"workspace": root} if root else {}),
+                      ttl=float(opts.get("ttl", "20") or 20))
+    store = Store(opts.get("store", DEFAULT_STORE))
+    sub = pos[0]
+    if sub == "list":
+        items = store.list()
+        if not items:
+            print("studio: проектов нет")
+        for p in items:
+            print(f"{p.get('score') if p.get('score') is not None else '--':>3}  "
+                  f"{p['name']:<24} {p['path']}")
+        return 0
+    if sub == "add":
+        path = pos[1] if len(pos) > 1 else opts.get("path", "")
+        if not path:
+            print("usage: forge studio add PATH [--name NAME]")
+            return 2
+        try:
+            item = store.add(path, opts.get("name", ""))
+        except (ValueError, OSError) as e:
+            print(f"studio: {e}")
+            return 2
+        print(f"studio: добавлен {item['name']} -> {item['path']}")
+        return 0
+    print(f"studio: неизвестная команда {sub!r}")
+    return 2
+
+
+def _web(args: list[str]) -> int:
+    """forge web <presets|new|audit|preview>: анимированные сайты."""
+    import json as _json
+    sys.path.insert(0, str(ROOT / "src"))
+    from forge.webstudio import audit as _audit
+    from forge.webstudio import generate as _generate
+    from forge.webstudio import list_presets as _presets
+    from forge.webstudio import render_text as _render
+    from forge.webstudio import serve_site as _serve
+    if not args or args[0] in ("-h", "--help", "help"):
+        print("usage: forge web presets [--json]")
+        print("       forge web new NAME [--out DIR] [--preset K] "
+              "[--tagline \"...\"] [--lang ru|en] [--json]")
+        print("       forge web audit DIR [--json]")
+        print("       forge web preview DIR [--port 8100] [--open]")
+        return 0
+    opts: dict[str, str] = {}
+    pos: list[str] = []
+    i = 1
+    while i < len(args):
+        a = args[i]
+        if a.startswith("--"):
+            key = a[2:].replace("-", "_")
+            if i + 1 < len(args) and not args[i + 1].startswith("--"):
+                opts[key] = args[i + 1]
+                i += 2
+            else:
+                opts[key] = "1"
+                i += 1
+        else:
+            pos.append(a)
+            i += 1
+    sub = args[0]
+    if sub == "presets":
+        items = _presets()
+        if "json" in opts:
+            print(_json.dumps(items, ensure_ascii=False, indent=2))
+        else:
+            for p in items:
+                print(f"{p['key']:10} {p['title']:12} {p['hint']}")
+        return 0
+    if sub == "new":
+        name = opts.get("name") or (pos[0] if pos else "")
+        if not name:
+            print("usage: forge web new NAME [--out DIR] [--preset K]")
+            return 2
+        out = opts.get("out") or "."
+        try:
+            res = _generate(out, name, preset=opts.get("preset", "aurora"),
+                            tagline=opts.get("tagline", ""),
+                            lang=opts.get("lang", "ru"))
+        except (ValueError, OSError) as e:
+            print(f"web: {e}")
+            return 2
+        if "json" in opts:
+            print(_json.dumps(res, ensure_ascii=False, indent=2))
+        else:
+            print(f"web: {res['preset_title']} -> {res['dir']}  "
+                  f"({res['score']}/100)")
+            for f in res["files"]:
+                print(f"  {f}")
+            if res["problems"]:
+                for p in res["problems"]:
+                    print(f"  FAIL {p}")
+        return 0 if res["ok"] else 1
+    if sub == "audit":
+        target = pos[0] if pos else "."
+        res = _audit(target)
+        if "json" in opts:
+            print(_json.dumps(res, ensure_ascii=False, indent=2))
+        else:
+            print(_render(res))
+        return 0 if res["ok"] else 1
+    if sub == "preview":
+        target = pos[0] if pos else "."
+        port = int(opts.get("port") or 8100)
+        return _serve(target, port=port, open_browser="open" in opts)
+    print(f"unknown web command: {sub}")
+    return 2
 
 
 def _config(args: list[str]) -> int:
@@ -1333,7 +1782,13 @@ def _pipe(args: list[str]) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = argv if argv is not None else sys.argv[1:]
     if not args or args[0] in ("-h", "--help", "help"):
-        print("usage: forge <modules|skill <name>|know <query>|mcp>")
+        print("usage: forge <command> [args]")
+        print("  inspect|map|audit|report|doctor|deps|secrets  project health")
+        print("  pipe|loop|do|quality|fix|refactor             checks and repair")
+        print("  gen|make|web|factory                          generators")
+        print("  fast write|patch|search|context|blueprint     speed department")
+        print("  serve|studio                                  local dashboards")
+        print("  lab|bench|skills|modules|route|mcp            experts and MCP")
         return 0
     cmd = args[0]
     if cmd == "modules":
@@ -1448,6 +1903,14 @@ def main(argv: list[str] | None = None) -> int:
         return _fix(args[1:])
     if cmd == "gen":
         return _gen(args[1:])
+    if cmd == "factory":
+        return _factory(args[1:])
+    if cmd == "fast":
+        return _fast(args[1:])
+    if cmd == "web":
+        return _web(args[1:])
+    if cmd == "studio":
+        return _studio(args[1:])
     if cmd == "ui":
         return _ui(args[1:])
     if cmd == "mcp":
