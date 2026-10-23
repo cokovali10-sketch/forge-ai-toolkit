@@ -7,13 +7,14 @@
 
 Без обучения моделей, без платных API, без выдумок — только проверяемые инструменты.
 
+[![CI](https://github.com/cokovali10-sketch/forge-ai-toolkit/actions/workflows/forge.yml/badge.svg)](https://github.com/cokovali10-sketch/forge-ai-toolkit/actions/workflows/forge.yml)
 [![tests](https://img.shields.io/badge/tests-233_passing-4ade80?style=for-the-badge)](#статус-и-честность)
 [![python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](#быстрый-старт)
 [![mcp](https://img.shields.io/badge/MCP-72_tools-8b5cf6?style=for-the-badge)](#mcp-72-инструмента)
-[![license](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](./forge/LICENSE)
+[![license](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](./LICENSE)
 [![offline](https://img.shields.io/badge/offline-no_cloud-0ea5e9?style=for-the-badge)](#безопасность)
 
-**Русский** · [English](./forge/README_EN.md) · [Полная инструкция](./forge/README_RU.md) · [Архитектура](./forge/docs/architecture.md) · [Каталог инструментов](./forge/docs/tools.md)
+**Русский** · [English](./forge/README_EN.md) · [Полная инструкция](./forge/README_RU.md) · [Архитектура](./forge/docs/architecture.md) · [Каталог инструментов](./forge/docs/tools.md) · [Issues](https://github.com/cokovali10-sketch/forge-ai-toolkit/issues)
 
 </div>
 
@@ -193,6 +194,7 @@ forge pipe heal .           :: контрольная точка + ремонт 
 ```
 forge-ai-toolkit/
 ├── README.md                 <- эта страница
+├── LICENSE                   <- MIT
 ├── .github/workflows/        <- CI и release
 └── forge/
     ├── src/forge/            <- код (cli, mcp, kit, pipe, refactor, langs, gen, speed, lab, ...)
@@ -244,6 +246,14 @@ forge-ai-toolkit/
 
 ---
 
+## Участие
+
+- Баг или идея — [issue](https://github.com/cokovali10-sketch/forge-ai-toolkit/issues).
+- Перед pull request: `python -m pytest forge/tests -q`, затем `python -m forge.cli pipe run forge`.
+- Ядро без новых зависимостей; вместо заглушек — честный `NOT_IMPLEMENTED`.
+
+---
+
 ## Лицензия
 
-MIT — см. [forge/LICENSE](./forge/LICENSE).
+MIT — см. [LICENSE](./LICENSE).
