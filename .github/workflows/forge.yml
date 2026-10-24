@@ -1,5 +1,11 @@
 name: forge-pipe
+
 on: [push, pull_request]
+
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   pipe:
     runs-on: ubuntu-latest
@@ -7,9 +13,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
-      - run: pip install -e ./forge
+      - run: python -m pip install -e "./forge[dev]"
       - run: python -m pytest forge/tests -q
       - run: python -m forge.cli pipe run forge --sarif forge.sarif
-      - uses: github/codeql-action/upload-sarif@v3
-        if: always()
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always() && github.event_name == 'push' && hashFiles('forge.sarif') != ''
         with: {sarif_file: forge.sarif}
