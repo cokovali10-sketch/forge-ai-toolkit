@@ -49,6 +49,17 @@ def test_missing_toolchains_degrade(tmp_path):
         assert isinstance(r.result, dict) and r.result.get("files_checked", 0) >= 0
 
 
+def test_collect_returns_absolute_paths(tmp_path, monkeypatch):
+    """cwd=root + относительный аргумент = root/root/... — регрессия pipe run."""
+    from forge.langs import base as _b
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "x.js").write_text("const a = 1;\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    found = _b.collect("src", {".js"})
+    assert found and all(p.is_absolute() for p in found)
+    assert found[0].resolve() == (tmp_path / "src" / "x.js").resolve()
+
+
 def test_langs_stage(tmp_path):
     from forge.pipe.stages import stage_langs
     from forge.langs import python

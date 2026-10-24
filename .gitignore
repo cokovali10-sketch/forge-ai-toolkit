@@ -14,10 +14,10 @@ lab-servers/
 *.forgebak
 quality-history/
 .forge-pipe-checkpoint.json
+forge-pipe-checkpoint.json
 .forge-fix.json
 .forge-pipe-history.jsonl
 forge-pipe-history.jsonl
-forge-pipe-checkpoint.json
 forge-pipe-report.json
 forge.sarif
 .forge/

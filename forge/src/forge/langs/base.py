@@ -23,9 +23,13 @@ def which(prog: str) -> str:
 
 
 def collect(root: str | Path, exts: set[str], cap: int = 2000) -> list[Path]:
-    """Файлы по расширениям. Лимит защищает от гигантских деревьев."""
+    """Файлы по расширениям. Лимит защищает от гигантских деревьев.
+
+    Пути всегда абсолютные: линтеры запускаются с cwd=root, и относительный
+    путь от CWD превратился бы в root/root/... (ловилось на `pipe run forge`).
+    """
     import os
-    base = Path(root)
+    base = Path(root).resolve()
     out: list[Path] = []
     if not base.is_dir():
         return out
