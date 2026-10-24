@@ -70,6 +70,29 @@ def test_yaml_bridge(tmp_path):
     assert str(api.get(str(y), "version")["value"]) == "1.0"
 
 
+def test_yaml_fallback_without_anvil(tmp_path, monkeypatch):
+    """Без Anvil простые YAML правятся встроенным парсером, а не падают."""
+    from forge.edit import api, yaml_bridge
+    monkeypatch.setattr(yaml_bridge, "find_anvil", lambda: "")
+    y = tmp_path / "plugin.yml"
+    y.write_text(
+        "# plugin config\nname: Demo\nversion: 1.0\n"
+        "author:\n  name: Acer\n  role: dev  # основной\n"
+        "commands:\n  - ping\n  - reload\n",
+        encoding="utf-8")
+    ins = api.inspect(str(y))
+    assert ins["format"] == "yaml" and ins["error"] == ""
+    assert "name" in ins["sections"]
+    assert api.get(str(y), "author.role")["value"] == "dev"
+    assert api.get(str(y), "commands.1")["value"] == "reload"
+    r = api.set(str(y), "author.role", "maintainer")
+    assert r["ok"] is True
+    text = y.read_text(encoding="utf-8")
+    assert "role: maintainer  # основной" in text
+    assert "# plugin config" in text and "name: Demo" in text
+    assert api.set(str(y), "missing.key", "x")["ok"] is False
+
+
 def test_edit_cli_and_mcp(tmp_path):
     from forge.cli.__main__ import main
     from forge.mcp.server import build_default_registry

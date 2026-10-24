@@ -9,7 +9,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+try:
+    from PIL import Image, ImageDraw
+except ImportError as _exc:  # pragma: no cover - depends on environment
+    raise ImportError(
+        "Pillow is required for asset generation: pip install 'forge-core[ui]'"
+    ) from _exc
 
 
 def _argb(hexstr: str) -> tuple[int, int, int, int]:

@@ -29,6 +29,10 @@ jobs:
 
   publish:
     needs: build
+    # Публикация включается переменной репозитория PYPI_PUBLISH=true и требует
+    # настроенного trusted publisher на PyPI (owner/repo/workflow/environment).
+    # Без него job пропускается, чтобы тег не давал красный workflow.
+    if: vars.PYPI_PUBLISH == 'true'
     runs-on: ubuntu-latest
     environment:
       name: pypi
