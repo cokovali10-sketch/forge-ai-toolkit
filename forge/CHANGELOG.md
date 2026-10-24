@@ -1,20 +1,7 @@
 # Changelog
 
-## 0.13.1
-- edit: YAML-мост больше не требует Anvil рядом — при его отсутствии работает
-  встроенный построчный парсер (вложенные словари, скаляры, списки), сохраняя
-  порядок ключей, отступы и комментарии; ошибка Anvil тоже уходит в fallback
-- langs: `collect()` возвращает абсолютные пути — исправлен двойной префикс
-  `root/root/...` при `forge pipe run forge` (относительный target + cwd=root),
-  из-за которого javascript-стадия падала на CI; добавлен регрессионный тест
-- ui: `Pillow` вынесен в extras `ui` и `dev`; без него `forge ui`/factory
-  падает с понятным сообщением `pip install 'forge-core[ui]'`
-- tests: `forge do` использует корень репозитория вместо жёсткого
-  `D:/Forge-Factority/forge`; добавлен тест YAML-fallback без Anvil
-- ci: публикация на PyPI включается только при `PYPI_PUBLISH=true`
-  (нужен trusted publisher), чтобы тег не ронял release-workflow
-
-## Unreleased
+## 1.0.0 - 2026-10-24
+- Official 1.0.0 Release: full suite of 72 MCP tools, 19 modules, and 8-stage pipeline.
 - speed: new `speed` department — `forge fast write|patch|search|context|
   blueprint|recipes|bench` and MCP tools `speed.*`: one call writes many files
   atomically, applies many exact/regex edits in one transaction, searches all

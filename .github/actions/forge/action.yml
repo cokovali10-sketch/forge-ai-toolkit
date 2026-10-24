@@ -1,0 +1,42 @@
+name: "Forge Init"
+description: "Initialize a new Forge project with CI, LICENSE, and project structure"
+branding:
+  color: "1e1e1e"
+  icon: "magic"
+
+inputs:
+  root:
+    description: "Path to the repository root (default: .)"
+    required: false
+    default: "."
+  ci:
+    description: "Generate GitHub Actions CI workflow"
+    required: false
+    default: "true"
+  suppress:
+    description: "Create .forge-suppress.json file"
+    required: false
+    default: "true"
+  force:
+    description: "Overwrite existing files"
+    required: false
+    default: "false"
+  pypi-publish:
+    description: "Enable PyPI publish job in release workflow"
+    required: false
+    default: "false"
+
+outputs:
+  status:
+    description: "Operation status"
+    value: "${{ steps.init.outputs.status }}"
+  created:
+    description: "Files created"
+    value: "${{ steps.init.outputs.created }}"
+  workflow-path:
+    description: "Path to generated CI workflow"
+    value: "${{ steps.init.outputs.workflow-path }}"
+
+runs:
+  using: "node20"
+  main: "dist/index.js"

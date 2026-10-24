@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "forge-core"
-version = "0.13.1"
+version = "1.0.0"
 description = "FORGE: universal dev-automation toolkit for AI agents - verification conveyor, code-quality advisor with safe auto-fix, self-healing loop, kit (map/test/ci/secrets/deps/doctor) and an MCP server."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,7 +14,7 @@ dependencies = []
 keywords = ["ai-agents", "mcp", "code-quality", "refactoring", "static-analysis",
             "developer-tools", "automation", "testing", "security", "minecraft"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",

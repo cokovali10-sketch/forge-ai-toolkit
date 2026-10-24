@@ -8,7 +8,7 @@
 Без обучения моделей, без платных API, без выдумок — только проверяемые инструменты.
 
 [![CI](https://github.com/cokovali10-sketch/forge-ai-toolkit/actions/workflows/forge.yml/badge.svg)](https://github.com/cokovali10-sketch/forge-ai-toolkit/actions/workflows/forge.yml)
-[![tests](https://img.shields.io/badge/tests-233_passing-4ade80?style=for-the-badge)](#статус-и-честность)
+[![tests](https://img.shields.io/badge/tests-235_passing-4ade80?style=for-the-badge)](#статус-и-честность)
 [![python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](#быстрый-старт)
 [![mcp](https://img.shields.io/badge/MCP-72_tools-8b5cf6?style=for-the-badge)](#mcp-72-инструмента)
 [![license](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](./LICENSE)
@@ -257,3 +257,4 @@ forge-ai-toolkit/
 ## Лицензия
 
 MIT — см. [LICENSE](./LICENSE).
+
